@@ -9,7 +9,7 @@ param_values_per_participant = 6
 rorschach_values_per_participant = 1
 num_sets = 2
 
-picture_details_randomization <- readr::read_csv(here("01-lineups", "plots", "picture-details.csv"))
+picture_details_randomization <- readr::read_csv(here("00-prolific", "plots", "picture-details.csv"))
 picture_details_randomization$set <- rep(c(1,1,2,2),num_param_values) 
 picture_details_randomization$rorschach <- substrRight(picture_details_randomization$param_value,1)
 
