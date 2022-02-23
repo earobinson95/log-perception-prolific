@@ -1,0 +1,14 @@
+name: estimation-pilot-app
+title: estimation-pilot-app
+username:
+account: emily-robinson
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5562748
+bundleId: 5602702
+url: https://emily-robinson.shinyapps.io/estimation-pilot-app/
+when: 1645462389.39958
+lastSyncTime: 1645462389.39958
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: example-generation.R|README.md|simulated-data-plots.png

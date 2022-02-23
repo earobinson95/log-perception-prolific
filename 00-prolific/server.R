@@ -1,11 +1,25 @@
+# ------------------------------------------------------------------------------
+# LOAD LIBRARIES ---------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
 library(shiny)
 library(shinyjs)
-library(ggplot2)
+
+library(tidyverse)
 library(lubridate)
-library(dplyr)
+
 library(RSQLite)
 library(here)
-library(tidyverse)
+
+# ------------------------------------------------------------------------------
+# CHECK WINDOW DIMENSIONS ------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+window_dim_min <- 400 #c(800, 600) # width, height
+
+# ------------------------------------------------------------------------------
+# SETUP STUDY 1: LINEUPS -------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 experiment_name <- "emily-log-1"
 
@@ -18,9 +32,6 @@ addResourcePath("examples", "examples")
 plots_folder <- "plots" # subfolders for data, pdf, png, svg. picture_details.csv in this folder
 trials_folder <- "trials" # subfolders for svg. picture_details_trial.csv in this folder
 
-
-window_dim_min <- 400 #c(800, 600) # width, height
-
 con <- dbConnect(SQLite(), dbname = "lineups_data.db")
 experiment <- dbReadTable(con, "experiment_details")
 if (nrow(experiment) > 1) {
@@ -29,6 +40,19 @@ if (nrow(experiment) > 1) {
 }
 dbDisconnect(con)
 
+# ------------------------------------------------------------------------------
+# SETUP STUDY 2: YOU DRAW IT ---------------------------------------------------
+# ------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------------------
+# SETUP STUDY 3: ESTIMATION ----------------------------------------------------
+# ------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------------------
+# BEGIN SERVER -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 shinyServer(function(input, output, session) {
 # This needs to be run every connection, not just once.
