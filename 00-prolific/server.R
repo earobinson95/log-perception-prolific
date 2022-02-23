@@ -15,7 +15,7 @@ library(here)
 # CHECK WINDOW DIMENSIONS ------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-window_dim_min <- 400 #c(800, 600) # width, height
+window_dim_min <- 400 # c(800, 600) # width, height
 
 # ------------------------------------------------------------------------------
 # SETUP STUDY 1: LINEUPS -------------------------------------------------------
@@ -55,11 +55,70 @@ dbDisconnect(con)
 # ------------------------------------------------------------------------------
 
 shinyServer(function(input, output, session) {
-# This needs to be run every connection, not just once.
-    source("code/randomization.R")
 
-    # reactive values to control the trials
-    values <- reactiveValues(
+# ------------------------------------------------------------------------------
+# INTRO / WELCOME --------------------------------------------------------------
+# ------------------------------------------------------------------------------
+  
+  # Only start experiment when consent is provided
+  observeEvent(input$beginexp, {
+    if (input$consent) updateCheckboxInput(session, "welcome", value = TRUE)
+  })
+  
+  # Provide a message if the browser is too small
+  observeEvent(input$dimension, {
+    if (any(input$dimension < window_dim_min))
+      showModal(
+        modalDialog(
+          title = "Window Size is too small",
+          sprintf("You must view this experiment in a browser window which is at least %s x %s", window_dim_min, window_dim_min),
+          size = "s",
+          easyClose = T
+        )
+      )
+    else {
+      removeModal()
+    }
+  })
+  
+# ------------------------------------------------------------------------------
+# DEMOGRAPHIC INFORMATION ------------------------------------------------------
+# ------------------------------------------------------------------------------
+  
+  # add demographic information to the database
+  observeEvent(input$submitdemo, {
+    
+    if (!is.null(input$nickname) && nchar(input$nickname) > 0 && !any(input$dimension < window_dim_min)) {
+      
+      # connect to data base
+      con <- dbConnect(SQLite(), dbname = "lineups_data.db")
+      
+      age <- ifelse(is.null(input$age), "", input$age)
+      gender <- ifelse(is.null(input$gender), "", input$gender)
+      academic_study <- ifelse(is.null(input$education), "", input$education)
+      
+      demoinfo <- data.frame(nick_name = input$nickname,
+                             age = age,
+                             gender = gender,
+                             academic_study = academic_study,
+                             ip_address = input$ipid)
+      
+      dbWriteTable(con, "users", demoinfo, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
+      
+      updateCheckboxInput(session, "ready", value = TRUE)
+    }
+  })
+
+# ------------------------------------------------------------------------------
+# STUDY 1: LINEUP --------------------------------------------------------------
+# ------------------------------------------------------------------------------
+  
+  # This needs to be run every connection, not just once.
+  source("code/randomization.R")
+
+  # reactive values to control the trials
+  values <- reactiveValues(
         experiment = experiment$experiment,
         question = experiment$question,
         pics = NULL,
@@ -89,38 +148,22 @@ shinyServer(function(input, output, session) {
                                  choices = values$reasons, selected = NA)
     })
 
-    # Only start experiment when consent is provided
-    observeEvent(input$beginexp, {
-        if (input$consent) updateCheckboxInput(session, "welcome", value = TRUE)
-    })
-
-    # Provide a message if the browser is too small
-    observeEvent(input$dimension, {
-        if (any(input$dimension < window_dim_min))
-            showModal(
-                modalDialog(
-                    title = "Window Size is too small",
-                    sprintf("You must view this experiment in a browser window which is at least %s x %s", window_dim_min, window_dim_min),
-                    size = "s",
-                    easyClose = T
-                )
-            )
-        else {
-            removeModal()
-        }
-    })
-
+# LINEUP EXAMPLES --------------------------------------------------------------
+    
     # Title header
-    output$welcome_header <- renderText("Welcome to a Survey on Graphical Inference")
-
-    # ---- Introduction --------------------------------------------------------
+    output$welcome_header <- renderText(
+      
+      return("Welcome to a Survey on Graphical Inference")
+      
+    )
+    
     # Welcome text and instructions
     output$welcome_text <- renderUI({
-        HTML("This web site is designed to conduct a survey on graphical inference which will help us understand human perception of graphics for use in communicating statistics.<br/><br/>
-               The following examples illustrate the types of questions you may encounter during this experiment.")
+      
+      HTML("This web site is designed to conduct a survey on graphical inference which will help us understand human perception of graphics for use in communicating statistics.<br/><br/>
+         The following examples illustrate the types of questions you may encounter during this experiment.")
     })
-
-    # ---- Example -------------------------------------------------------------
+    
     output$example1_q <- renderText({
         return(paste0("Example 1: ", values$question))
     })
@@ -160,37 +203,9 @@ shinyServer(function(input, output, session) {
                     How certain are you: <b>Certain</b><br/>
                     ")))
     })
-
-    # ---- Demographic information ---------------------------------------------
-    output$demo_text <- renderText({
-        return("Please fill out the demographic information to begin.")
-    })
-
-    # add demographic information to the database
-    observeEvent(input$submitdemo, {
-        if (!is.null(input$nickname) && nchar(input$nickname) > 0 && !any(input$dimension < window_dim_min)) {
-            con <- dbConnect(SQLite(), dbname = "lineups_data.db")
-
-            age <- ifelse(is.null(input$age), "", input$age)
-            gender <- ifelse(is.null(input$gender), "", input$gender)
-            academic_study <- ifelse(is.null(input$education), "", input$education)
-
-            demoinfo <- data.frame(nick_name = input$nickname,
-                                   age = age,
-                                   gender = gender,
-                                   academic_study = academic_study,
-                                   ip_address = "")
-
-            dbWriteTable(con, "users", demoinfo, append = TRUE, row.names = FALSE)
-            dbDisconnect(con)
-
-            updateCheckboxInput(session, "ready", value = TRUE)
-        }
-    })
-
-
-
-    # ---- Question Flow -------------------------------------------------------
+    
+#  LINEUP QUESTION FLOW --------------------------------------------------------
+    
     output$question <- renderText({
         return(values$question)
     })
@@ -372,4 +387,17 @@ shinyServer(function(input, output, session) {
 
             }) # end WithProgress
     }) # end renderUI
-}) # End app definition
+    
+# ------------------------------------------------------------------------------
+# STUDY 2: YOU DRAW IT ---------------------------------------------------------
+# ------------------------------------------------------------------------------
+    
+# ------------------------------------------------------------------------------
+# STUDY 3: ESTIMATION ----------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+}) # end server
