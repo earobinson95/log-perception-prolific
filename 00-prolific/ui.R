@@ -46,7 +46,7 @@ inputBrowserDims <- tags$head(
 # BEGIN NAVPAR PAGE ------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-navbarPage("Perception of Statistical Graphics", inverse = TRUE, theme = shinytheme("spacelab"),
+navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE, theme = shinytheme("spacelab"),
            
   tags$style(type = "text/css",
              # Define the col widths
@@ -71,6 +71,7 @@ navbarPage("Perception of Statistical Graphics", inverse = TRUE, theme = shinyth
   # ----------------------------------------------------------------------------
   
   tabPanel("Informed Consent",
+           value = "informed-consent-tab",
            
     fluidRow(
       column(id = "informed_consent_sidebar", width = 3,
@@ -107,6 +108,7 @@ navbarPage("Perception of Statistical Graphics", inverse = TRUE, theme = shinyth
   # ----------------------------------------------------------------------------
   
   tabPanel("Demographics",
+           value = "demographics-tab",
            
     fluidRow(
       column(id = "informed_consent_sidebar", width = 3,
@@ -174,73 +176,166 @@ navbarPage("Perception of Statistical Graphics", inverse = TRUE, theme = shinyth
   # ----------------------------------------------------------------------------
   
   tabPanel("Study 1: Lineups",
+           value = "study1-lineups-tab",
            
            fluidRow(
              column(id = "lineups_sidebar", width = 3,
-                    # div(
-                    # id = "one", class = "left",
-                    # This panel shows if the experiment was chosen and informed consent hasn't been given
-                    conditionalPanel(
-                      condition = "!input.welcome",
-                      h4("Study 1: Lineups"),
-                      helpText(
-                        "In this survey a series of similar looking charts will be presented.",
-                        "We would like you to respond to the following questions."),
-                      helpText("1. Pick the plot based on the survey question"),
-                      helpText("2. Provide reasons for choice"),
-                      helpText("3. How certain are you?"),
+                    
+                    # create indicator for starting lineups within this tab
+                    hidden(
+                      checkboxInput("lineups_go", "Start Lineup Study", value = FALSE)
+                    ),
+                    
+                    # This panel shows if the participant has not hit start for the lineup study
+                    conditionalPanel(condition = "!input.lineups_go",
                       
-                      actionButton("beginexp", "Begin Study 1", class = "btn btn-info")
+                      h4("Lineups start sidebar"),
                       
-                    ) # end condition
+                      actionButton("begin_lineups", "Begin Study 1", class = "btn btn-info")
+                      
+                    ), # end lineup example condition (sidebar)
+                    
+                    conditionalPanel(condition = "input.lineups_go",
+                                     
+                        h4("Lineup question flow sidebar questions.")
+                        
+                    ) # end lineup question flow condition (sidebar)
                     
              ), # end sidebar panel column
              
              column(id = "lineups_main", width = 9,
-                    conditionalPanel(condition = "!input.welcome",
-                                     h4(textOutput("welcome_header")),
-                                     uiOutput("welcome_text"),
+                    
+                    # this is the lineup study example page
+                    conditionalPanel(condition = "!input.lineups_go",
                                      
-                                     h4(textOutput("example1_q")),
-                                     div(
-                                       class = "ex-lineup-container",
-                                       imageOutput("example1_plot", height = "auto")
-                                     ),
-                                     br(),
-                                     br(),
-                                     uiOutput("example1_a"),
+                        h4("Lineups examples go here.")
                                      
-                                     h4(textOutput("example2_q")),
-                                     div(
-                                       class = "ex-lineup-container",
-                                       imageOutput("example2_plot", height = "auto")
-                                     ),
-                                     br(),
-                                     br(),
-                                     uiOutput("example2_a")
-                    ),
-                    conditionalPanel(condition = "input.welcome && !input.ready",
-                                     h4(textOutput("demo_text"))
-                    )
-             ) # end main column
+                    ), # end lineup example condition (main)
+                    
+                    # This is the question flow
+                    conditionalPanel(condition = "input.lineups_go",
+                                     
+                        h4("Lineup plot goes here.")
+                                     
+                    ) # end lineup question flow condition (main)
+                    
+      ), # end main column
+    
+      # Javascript action script for lineups -- may not be necessary
+      includeScript("www/js/action.js")
              
-           ) # end fluid row
+    ) # end fluid row
            
-           ), # end lineups tab
+  ), # end lineups tab
   
   # ----------------------------------------------------------------------------
   # STUDY 2: YOU DRAW IT -------------------------------------------------------
   # ----------------------------------------------------------------------------
   
-  tabPanel("Study 2: You Draw It"
+  tabPanel("Study 2: You Draw It",
+           value = "study2-you-draw-it-tab",
            
-           ), # end you draw it tab
+           fluidRow(
+             column(id = "you_draw_it_sidebar", width = 3,
+                    
+                    # create indicator for starting lineups within this tab
+                    hidden(
+                      checkboxInput("you_draw_it_go", "Start You Draw It Study", value = FALSE)
+                    ),
+                    
+                    # This panel shows if the participant has not hit start for the lineup study
+                    conditionalPanel(condition = "!input.you_draw_it_go",
+                                     
+                                     h4("Study 2: You Draw It"),
+                                     
+                                     actionButton("begin_you_draw_it", "Begin Study 2", class = "btn btn-info")
+                                     
+                    ), # end lineup example condition (sidebar)
+                    
+                    conditionalPanel(condition = "input.you_draw_it_go",
+                                     
+                                     h4("You Draw It Sidebar question flow.")
+                                     
+                                     
+                    ) # end you draw it question flow condition (sidebar)
+                    
+             ), # end sidebar panel column
+             
+             column(id = "you_draw_it_main", width = 9,
+                    
+                    # this is the you draw it study example page
+                    conditionalPanel(condition = "!input.you_draw_it_go",
+                        
+                                     h4("You Draw it examples go here.")             
+                             
+                    ), # end lineup example condition (main)
+                    
+                    # This is the question flow
+                    conditionalPanel(condition = "input.you_draw_it_go",
+                          
+                                     h4("You Draw It Study Flow")
+                                     
+                    ) # end you draw it question flow condition (main)
+                    
+      ) # end you draw it main column
+           
+    ) # end you draw it fluid row
+  
+  ), # end you draw it tab
   
   # ----------------------------------------------------------------------------
   # STUDY 3: ESTIMATION --------------------------------------------------------
   # ----------------------------------------------------------------------------
   
-  tabPanel("Study 3: Estimation"
+  tabPanel("Study 3: Estimation",
+           value = "estimation-tab",
+           
+           fluidRow(
+             column(id = "estimation_sidebar", width = 3,
+                    
+                    # create indicator for starting lineups within this tab
+                    hidden(
+                      checkboxInput("estimation_go", "Start You Draw It Study", value = FALSE)
+                    ),
+                    
+                    # This panel shows if the participant has not hit start for the lineup study
+                    conditionalPanel(condition = "!input.estimation_go",
+                                     
+                                     h4("Study 3: Estimation"),
+                                     
+                                     actionButton("begin_estimation", "Begin Study 3", class = "btn btn-info")
+                                     
+                    ), # end lineup example condition (sidebar)
+                    
+                    conditionalPanel(condition = "input.estimation_go",
+                                     
+                                     h4("Estimation Sidebar question flow.")
+                                     
+                                     
+                    ) # end you draw it question flow condition (sidebar)
+                    
+             ), # end sidebar panel column
+             
+             column(id = "estimation_main", width = 9,
+                    
+                    # this is the you draw it study example page
+                    conditionalPanel(condition = "!input.estimation_go",
+                                     
+                                     h4("Estimation examples go here.")             
+                                     
+                    ), # end lineup example condition (main)
+                    
+                    # This is the question flow
+                    conditionalPanel(condition = "input.estimation_go",
+                                     
+                                     h4("Estimation Study Flow")
+                                     
+                    ) # end you draw it question flow condition (main)
+                    
+             ) # end you draw it main column
+             
+           ) # end you draw it fluid row
+           
            
            ), # end estimation tab
   
@@ -248,8 +343,12 @@ navbarPage("Perception of Statistical Graphics", inverse = TRUE, theme = shinyth
   # COMPLETE STUDY -------------------------------------------------------------
   # ----------------------------------------------------------------------------
   
-  tabPanel("Done"
+  tabPanel("Done",
+           value = "done-tab",
            
+           h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
+           br(),
+           h4("52BD9173")
            ) # end done tab
   
   # ----------------------------------------------------------------------------
