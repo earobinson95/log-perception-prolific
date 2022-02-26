@@ -1,6 +1,13 @@
+# prolific ui
+
+# ------------------------------------------------------------------------------
+# LOAD LIBRARIES ---------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
 library(shiny)
 library(shinyjs)
 library(shinythemes)
+library(r2d3)
 
 # ------------------------------------------------------------------------------
 # GRAB USER ID INFO-------------------------------------------------------------
@@ -189,15 +196,38 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This panel shows if the participant has not hit start for the lineup study
                     conditionalPanel(condition = "!input.lineups_go",
                       
-                      h4("Lineups start sidebar"),
-                      
-                      actionButton("begin_lineups", "Begin Study 1", class = "btn btn-info")
+                        h4("Study 1: Lineups"),
+                        helpText("In this survey a series of similar looking charts will be presented.",
+                                 "We would like you to respond to the following questions."),
+                        helpText("1. Pick the plot based on the survey question"),
+                        helpText("2. Provide reasons for choice"),
+                        helpText("3. How certain are you?"),
+                        br(),
+                        actionButton("begin_lineups", "Begin Study 1", class = "btn btn-info")
                       
                     ), # end lineup example condition (sidebar)
                     
                     conditionalPanel(condition = "input.lineups_go",
                                      
-                        h4("Lineup question flow sidebar questions.")
+                        h4("Selection"),
+                        textInput("response_no", "Choice", value = "", placeholder = "Click the plot to select"),
+                        # selectizeInput("response_no", "Choice", choices = 1:20, selected = NULL, multiple = T),
+                                     
+                        # Handle other reasoning logic
+                        conditionalPanel(condition = "!input.otheronly",
+                                         checkboxGroupInput("reasoning", "Reasoning", choices = "")
+                        ),
+                        conditionalPanel(condition = "input.reasoning.indexOf('Other') > -1 || input.otheronly",
+                                         textInput("other", "Other Reason")
+                        ),
+                                     
+                        selectizeInput("certain", "How certain are you?",
+                                       choices = c("", "Very Uncertain", "Uncertain",
+                                                   "Neutral", "Certain", "Very Certain")),
+                        actionButton("submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
+                        hr(),
+                        h4("Status"),
+                        h5(textOutput("lineup_status"))
                         
                     ) # end lineup question flow condition (sidebar)
                     
@@ -208,7 +238,24 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # this is the lineup study example page
                     conditionalPanel(condition = "!input.lineups_go",
                                      
-                        h4("Lineups examples go here.")
+                        h4(textOutput("lineups_header")),
+                        uiOutput("lineups_text"),
+                                     
+                        h4(textOutput("lineups_example1_q")),
+                        div(
+                            class = "ex-lineup-container",
+                            imageOutput("lineups_example1_plot", height = "auto")
+                        ),
+                        br(),
+                        uiOutput("example1_a"),
+                                     
+                        h4(textOutput("lineups_example2_q")),
+                        div(
+                            class = "ex-lineup-container",
+                            imageOutput("lineups_example2_plot", height = "auto")
+                        ),
+                        br(),
+                        uiOutput("lineups_example2_a")
                                      
                     ), # end lineup example condition (main)
                     

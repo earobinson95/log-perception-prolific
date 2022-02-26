@@ -1,3 +1,5 @@
+# prolific sever
+
 # ------------------------------------------------------------------------------
 # LOAD LIBRARIES ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -21,7 +23,7 @@ library(gridSVG)
 # OVERALL SET UP ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-window_dim_min <- 400 # c(800, 600) # width, height
+window_dim_min <- 750
 
 # add resource paths so Shiny can see them
 addResourcePath("plots", "plots")
@@ -32,18 +34,14 @@ addResourcePath("examples", "examples")
 # SETUP STUDY 1: LINEUPS -------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-experiment_name <- "emily-log-1"
+lineups_experiment_name <- "emily-log-1"
 
 # define folders
 plots_folder <- "plots" # subfolders for data, pdf, png, svg. picture_details.csv in this folder
 trials_folder <- "trials" # subfolders for svg. picture_details_trial.csv in this folder
 
 con <- dbConnect(SQLite(), dbname = "lineups_data.db")
-experiment <- dbReadTable(con, "experiment_details")
-if (nrow(experiment) > 1) {
-    experiment <- experiment[nrow(experiment),]
-    warning("Multiple rows in the experiment_details table. Only the last row will be used.")
-}
+lineups_experiment <- dbReadTable(con, "experiment_details")
 dbDisconnect(con)
 
 # ------------------------------------------------------------------------------
@@ -134,6 +132,12 @@ drawr <- function(data,
   )
   
 }
+
+you_draw_it_experiment_name <- "emily-log-you-draw-it-pilot-app"
+
+con <- dbConnect(sqlite.driver, dbname = "you_draw_it_data.db")
+you_draw_it_experiment <- dbReadTable(con, "experiment_details")
+dbDisconnect(con)
 
 # ------------------------------------------------------------------------------
 # SETUP STUDY 3: ESTIMATION ----------------------------------------------------
@@ -233,20 +237,20 @@ shinyServer(function(input, output, session) {
 
   # reactive lineup_values to control the trials
   lineup_values <- reactiveValues(
-        experiment = experiment$experiment,
-        question = experiment$question,
+        experiment = lineups_experiment$experiment,
+        question = lineups_experiment$question,
         pics = NULL,
         submitted = FALSE, choice = NULL,
-        reasons = strsplit(experiment$reasons, ",")[[1]],
+        reasons = strsplit(lineups_experiment$reasons, ",")[[1]],
         starttime = NULL,
-        trialsreq = experiment$trials_req,
-        trialsleft = experiment$trials_req,
-        lpp = experiment$lpp,
-        lppleft = experiment$lpp,
+        trialsreq = lineups_experiment$trials_req,
+        trialsleft = lineups_experiment$trials_req,
+        lpp = lineups_experiment$lpp,
+        lppleft = lineups_experiment$lpp,
         pic_id = 0, choice = NULL,
         correct = NULL, result = "")
 
-    output$debug <- renderText({experiment$question})
+    output$debug <- renderText({lineups_experiment$question})
 
     # Show other text input box if other is selected
     observe({
@@ -276,11 +280,11 @@ shinyServer(function(input, output, session) {
     })
     
     # Lineup Example 1
-    output$lineup_example1_q <- renderText({
+    output$lineups_example1_q <- renderText({
         return(paste0("Example 1: ", lineup_values$question))
     })
 
-    output$lineup_example1_plot <- renderImage({
+    output$lineups_example1_plot <- renderImage({
         if (is.null(lineup_values$experiment)) return(NULL)
 
         list(src = file.path("examples", "lineups", "example1.png"),
@@ -288,7 +292,7 @@ shinyServer(function(input, output, session) {
              style = "max-width:100%; max-height = 100%")
     }, deleteFile = FALSE)
 
-    output$lineup_example1_a <- renderUI({
+    output$lineups_example1_a <- renderUI({
         return(HTML(paste0("
             Your choice: <b>Plot 4</b><br/>
             Reasoning: <b>", lineup_values$reasons[1], "</b><br/>
@@ -297,11 +301,11 @@ shinyServer(function(input, output, session) {
     })
 
     # Lineup Example 2
-    output$lineup_example2_q <- renderText({
+    output$lineups_example2_q <- renderText({
         return(paste0("Example 2: ", lineup_values$question))
     })
 
-    output$lineup_example2_plot <- renderImage({
+    output$lineups_example2_plot <- renderImage({
         if (is.null(lineup_values$experiment)) return(NULL)
 
         list(src = file.path("examples", "lineups", "example2.png"),
@@ -309,7 +313,7 @@ shinyServer(function(input, output, session) {
              style = "max-width:100%; max-height = 100%")
     }, deleteFile = FALSE)
 
-    output$lineup_example2_a <- renderUI({
+    output$lineups_example2_a <- renderUI({
         return(HTML(paste0("
                     Your choice: <b>Plot 1</b><br/>
                     Reasoning: <b>", lineup_values$reasons[2], "</b><br/>
@@ -335,8 +339,8 @@ shinyServer(function(input, output, session) {
     
     # reactive values to control the trials
     you_draw_it_values <- reactiveValues(
-      experiment = experiment$experiment,
-      question = experiment$question,
+      experiment = you_draw_it_experiment$experiment,
+      question = you_draw_it_experiment$question,
       practicetext = "",
       practicegif_file = "",
       pics = NULL,
@@ -346,14 +350,14 @@ shinyServer(function(input, output, session) {
       starttime = NULL,
       practicereq  = nrow(practice_data),
       practiceleft = nrow(practice_data),
-      ydipp   = experiment$ydi_pp,
-      ydippleft = experiment$ydi_pp,
+      ydipp   = you_draw_it_experiment$ydi_pp,
+      ydippleft = you_draw_it_experiment$ydi_pp,
       parms = 0,
       taskNum = NA,
       linear  = NULL,
       result = "")
     
-    # output$you_draw_it_debug <- renderText({experiment$question})
+    # output$you_draw_it_debug <- renderText({you_draw_it_experiment$question})
     
     # ---- Introduction --------------------------------------------------------
     
