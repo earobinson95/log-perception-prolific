@@ -23,7 +23,7 @@ library(gridSVG)
 # OVERALL SET UP ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-window_dim_min <- 750
+window_dim_min <- 600
 
 # add resource paths so Shiny can see them
 addResourcePath("plots", "plots")
@@ -267,16 +267,10 @@ shinyServer(function(input, output, session) {
     })
 
 # LINEUP EXAMPLES --------------------------------------------------------------
-    
-    # Lineup Title Header
-    output$lineups_header <- renderText(
-      return("Study 1: Lineups")
-    )
-    
+  
     # Lineup Text and Instructions
     output$lineups_text <- renderUI({
-      HTML("This study is designed to conduct a survey on graphical inference which will help us understand human perception of graphics for use in communicating statistics.<br/><br/>
-         The following examples illustrate the types of questions you may encounter during this experiment.")
+      HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
     })
     
     # Lineup Example 1
@@ -360,15 +354,10 @@ shinyServer(function(input, output, session) {
     # output$you_draw_it_debug <- renderText({you_draw_it_experiment$question})
     
     # ---- Introduction --------------------------------------------------------
-    
-    # Title header
-    output$you_draw_it_welcome_header <- renderText("Study 2: You Draw It")
-    
+
     # You Draw It welcome text and instructions
-    output$you_draw_it_welcome_text <- renderUI({
-      HTML("This web site is designed to conduct a survey on graphical inference which will help us understand human perception of graphics for use in communicating statistics.<br/><br/>
-               The following examples illustrate the types of questions you may encounter during this experiment.<br/>
-             <b>If the gifs do not show up, refresh the page and they should appear.</b>")
+    output$you_draw_it_text <- renderUI({
+      HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
     })
     
     # ---- You Draw It Examples ------------------------------------------------

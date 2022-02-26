@@ -238,7 +238,6 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # this is the lineup study example page
                     conditionalPanel(condition = "!input.lineups_go",
                                      
-                        h4(textOutput("lineups_header")),
                         uiOutput("lineups_text"),
                                      
                         h4(textOutput("lineups_example1_q")),
@@ -247,7 +246,8 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                             imageOutput("lineups_example1_plot", height = "auto")
                         ),
                         br(),
-                        uiOutput("example1_a"),
+                        uiOutput("lineups_example1_a"),
+                        br(),
                                      
                         h4(textOutput("lineups_example2_q")),
                         div(
@@ -293,9 +293,11 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This panel shows if the participant has not hit start for the lineup study
                     conditionalPanel(condition = "!input.you_draw_it_go",
                                      
-                                     h4("Study 2: You Draw It"),
-                                     
-                                     actionButton("begin_you_draw_it", "Begin Study 2", class = "btn btn-info")
+                        h4("Study 2: You Draw It"),
+                        helpText("In this survey points following a trend will be shown.",
+                                 "We would like you to finish drawing the trend for the light yellow box using your mouse."),
+                        br(),
+                        actionButton("begin_you_draw_it", "Begin Study 2", class = "btn btn-info")
                                      
                     ), # end lineup example condition (sidebar)
                     
@@ -313,7 +315,12 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # this is the you draw it study example page
                     conditionalPanel(condition = "!input.you_draw_it_go",
                         
-                                     h4("You Draw it examples go here.")             
+                        uiOutput("you_draw_it_text"),
+                                     
+                        h4(textOutput("you_draw_it_example1_q")),
+                        img(src="examples/you-draw-it/exponential.gif", align = "center", width = 350),
+                        h4(textOutput("you_draw_it_example2_q")),
+                        img(src="examples/you-draw-it/linear1.gif", align = "center", width = 350)            
                              
                     ), # end lineup example condition (main)
                     
