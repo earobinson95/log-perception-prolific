@@ -228,7 +228,8 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         selectizeInput("certain", "How certain are you?",
                                        choices = c("", "Very Uncertain", "Uncertain",
                                                    "Neutral", "Certain", "Very Certain")),
-                        actionButton("submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
+                        br(),
+                        uiOutput("lineups_action_buttons"), 
                         hr(),
                         h4("Status"),
                         h5(textOutput("lineup_status"))
@@ -307,7 +308,9 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     
                     conditionalPanel(condition = "input.you_draw_it_go",
                                      
-                                     h4("You Draw It Sidebar question flow.")
+                        h4("You Draw It Sidebar question flow."),
+                        br(),
+                        uiOutput("you_draw_it_action_buttons")           
                                      
                                      
                     ) # end you draw it question flow condition (sidebar)
@@ -346,7 +349,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
   # ----------------------------------------------------------------------------
   
   tabPanel("Study 3: Estimation",
-           value = "estimation-tab",
+           value = "study3-estimation-tab",
            
            fluidRow(
              column(id = "estimation_sidebar", width = 3,
@@ -373,8 +376,6 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         uiOutput("question_textUI"),
                         br(),
                         uiOutput("estimation_action_buttons"),
-                        hr(),
-                        h4("Status"),
                         h5(textOutput("estimation_status"))
                                      
                                      
@@ -422,12 +423,11 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                                      
                     ) # end you draw it question flow condition (main)
                     
-             ) # end you draw it main column
+      ) # end you draw it main column
              
-           ) # end you draw it fluid row
+    ) # end you draw it fluid row
            
-           
-           ), # end estimation tab
+  ), # end estimation tab
   
   # ----------------------------------------------------------------------------
   # COMPLETE STUDY -------------------------------------------------------------
@@ -439,7 +439,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
            h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
            br(),
            h4("52BD9173")
-           ) # end done tab
+  ) # end done tab
   
   # ----------------------------------------------------------------------------
   # ----------------------------------------------------------------------------

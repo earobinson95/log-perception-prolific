@@ -167,7 +167,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  # shinyjs::disable(selector = '.navbar-nav a')
+  shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -332,7 +332,7 @@ shinyServer(function(input, output, session) {
                     ")))
     })
     
-    # Start lineup study
+    # Move to Lineup Study Tab
     observeEvent(input$begin_lineups, {
       updateCheckboxInput(session, "lineups_go", value = TRUE)
     })
@@ -340,6 +340,16 @@ shinyServer(function(input, output, session) {
     
     # LINEUP QUESTION FLOW -----------------------------------------------------
     
+    output$lineups_action_buttons <- renderUI({
+      # actionButton("lineups_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
+      actionButton("lineups_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+    })
+    
+    
+    # Move to You Draw It Study 
+    observeEvent(input$lineups_complete, {
+      updateTabsetPanel(session, "inNavBar", selected = "study2-you-draw-it-tab")
+    })
     
     
 # ------------------------------------------------------------------------------
@@ -391,6 +401,17 @@ shinyServer(function(input, output, session) {
     
     # ---- You Draw It Question Flow -------------------------------------------
     
+    output$you_draw_it_action_buttons <- renderUI({
+        actionButton("you_draw_it_study_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+    })
+    
+    
+    
+    
+    # move to estimation study
+    observeEvent(input$you_draw_it_study_complete, {
+      updateTabsetPanel(session, "inNavBar",selected = "study3-estimation-tab")
+    })
     
     
 # ------------------------------------------------------------------------------
@@ -459,7 +480,11 @@ shinyServer(function(input, output, session) {
       
        if (estimation_values$qcounter <= estimation_values$qreq) {
         
-         actionButton("estimation_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+         tagList(
+           actionButton("estimation_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
+           hr(),
+           h4("Status")
+         )
         
       } else if (estimation_values$qcounter > estimation_values$qreq) {
         
@@ -520,7 +545,7 @@ shinyServer(function(input, output, session) {
         
         if (estimation_values$qcounter > estimation_values$qreq) { # Generate completion code
           
-          estimation_values$scenario <- "All done! Congratulations!"
+          estimation_values$scenario <- "Study 3 Complete! Hit continue to recieve your Prolific confirmation code."
           #estimation_values$scenario <- paste("All done! Congratulations! Please click the URL to complete the study:")
           updateCheckboxInput(session, "done", value = TRUE)
         }
@@ -602,7 +627,6 @@ shinyServer(function(input, output, session) {
           textInput("question_text",
                     estimation_randomization[estimation_values$qcounter, "qtext"],
                     value = ""),
-          
           bsTooltip("question_text", "In words, provide a description of the population."),
           
         )
@@ -613,7 +637,6 @@ shinyServer(function(input, output, session) {
           numericInput("question_text",
                        estimation_randomization[estimation_values$qcounter, "qtext"],
                        value = ""),
-          
           bsTooltip(id = "question_text", 
                     title = "Provide a numerical approximation.")
         )
