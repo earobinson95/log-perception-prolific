@@ -4,9 +4,13 @@
 # LOAD LIBRARIES ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
+# Shiny specific
 library(shiny)
 library(shinyjs)
 library(shinythemes)
+library(shinyBS)
+library(shinyhelper)
+
 library(r2d3)
 
 # ------------------------------------------------------------------------------
@@ -355,9 +359,11 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This panel shows if the participant has not hit start for the lineup study
                     conditionalPanel(condition = "!input.estimation_go",
                                      
-                                     h4("Study 3: Estimation"),
-                                     
-                                     actionButton("begin_estimation", "Begin Study 3", class = "btn btn-info")
+                        h4("Study 3: Estimation"),
+                        helpText("In this survey, points following a trend will be shown.",
+                                 "We would like you to provide estimated values for the associated questions."),
+                        br(),             
+                        actionButton("begin_estimation", "Begin Study 3", class = "btn btn-info")
                                      
                     ), # end lineup example condition (sidebar)
                     
@@ -375,14 +381,26 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # this is the you draw it study example page
                     conditionalPanel(condition = "!input.estimation_go",
                                      
-                                     h4("Estimation examples go here.")             
+                        uiOutput("estimation_text"),
+                        br(),
+                        helpText(h4("Example 1:")),
+                        HTML("Recently, a flying squirrel population was discovered on a college campus. The squirrel population on campus is illustrated in the graph. We need your help answering a few questions regarding the population of flying squirrels on campus."),
+                        br(),
+                        br(),
+                        img(src = "examples/estimation/example-linear-drawing.png", width="90%", align = "center"),
+                        br(),
+                        helpText(h4("Example 2:")),
+                        HTML("After winter, bunnies began inhabiting a valley. The bunny population in the valley is illustrated in the graph. We need your help answering a few questions regarding the population of bunnies in the valley."),
+                        br(),
+                        br(),
+                        img(src = "examples/estimation/example-log-drawing.png", width="90%", align = "center")            
                                      
                     ), # end lineup example condition (main)
                     
                     # This is the question flow
                     conditionalPanel(condition = "input.estimation_go",
                                      
-                                     h4("Estimation Study Flow")
+                        h4("Estimation Study Flow")
                                      
                     ) # end you draw it question flow condition (main)
                     

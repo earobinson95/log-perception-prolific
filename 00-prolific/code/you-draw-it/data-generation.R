@@ -204,8 +204,7 @@ library(RSQLite)
 library(DBI)
 sqlite.driver <- dbDriver("SQLite")
 
-# filename <- "you-draw-it-development/you-draw-it-pilot-app/you_draw_it_data.db"
-filename <- "you_draw_it_data.db"
+filename <- "databases/02_you_draw_it_data.db"
 con <- dbConnect(sqlite.driver, dbname = filename)
 # dbListTables(con)
   exp_parameter_details        <- dbReadTable(con, "exp_parameter_details")

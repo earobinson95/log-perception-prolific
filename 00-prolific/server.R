@@ -4,20 +4,28 @@
 # LOAD LIBRARIES ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
+# Shiny specific
 library(shiny)
 library(shinyjs)
+library(shinyBS)
+library(shinyhelper)
 
+# Data Management and Plotting
 library(tidyverse)
+library(scales)
+library(purrr)
 library(lubridate)
 
+# Plotting Specifics
+library(r2d3)
+library(gridSVG)
+
+# Data Importing and Exporting
+library(readr)
+# library(here)
 library(RSQLite)
 library(DBI)
 sqlite.driver <- dbDriver("SQLite")
-library(here)
-
-library(r2d3)
-library(purrr)
-library(gridSVG)
 
 # ------------------------------------------------------------------------------
 # OVERALL SET UP ---------------------------------------------------------------
@@ -40,7 +48,7 @@ lineups_experiment_name <- "emily-log-1"
 plots_folder <- "plots" # subfolders for data, pdf, png, svg. picture_details.csv in this folder
 trials_folder <- "trials" # subfolders for svg. picture_details_trial.csv in this folder
 
-con <- dbConnect(SQLite(), dbname = "lineups_data.db")
+con <- dbConnect(SQLite(), dbname = "databases/01_lineups_data.db")
 lineups_experiment <- dbReadTable(con, "experiment_details")
 dbDisconnect(con)
 
@@ -135,7 +143,7 @@ drawr <- function(data,
 
 you_draw_it_experiment_name <- "emily-log-you-draw-it-pilot-app"
 
-con <- dbConnect(sqlite.driver, dbname = "you_draw_it_data.db")
+con <- dbConnect(sqlite.driver, dbname = "databases/02_you_draw_it_data.db")
 you_draw_it_experiment <- dbReadTable(con, "experiment_details")
 dbDisconnect(con)
 
@@ -200,7 +208,7 @@ shinyServer(function(input, output, session) {
          (!is.null(input$recruitment) & input$recruitment != "") && 
          (!is.null(input$prolificID) & input$prolificID != "")) {
       # connect to data base
-      con <- dbConnect(SQLite(), dbname = "demographics.db")
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics.db")
       
       age <- ifelse(is.null(input$age), "", input$age)
       gender <- ifelse(is.null(input$gender), "", input$gender)
@@ -351,16 +359,13 @@ shinyServer(function(input, output, session) {
       linear  = NULL,
       result = "")
     
-    # output$you_draw_it_debug <- renderText({you_draw_it_experiment$question})
     
-    # ---- Introduction --------------------------------------------------------
-
+    # ---- You Draw It Examples ------------------------------------------------
+    
     # You Draw It welcome text and instructions
     output$you_draw_it_text <- renderUI({
       HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
     })
-    
-    # ---- You Draw It Examples ------------------------------------------------
     
     output$you_draw_it_example1_q <- renderText({
       return(paste0("Example 1: ", you_draw_it_values$question))
@@ -383,11 +388,12 @@ shinyServer(function(input, output, session) {
 # STUDY 3: ESTIMATION ----------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-    # ---- Introduction --------------------------------------------------------
-    
     
     # ---- You Draw It Examples ------------------------------------------------
     
+    output$estimation_text <- renderUI({
+      HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
+    })
     
     # Start estimation study
     observeEvent(input$begin_estimation, {

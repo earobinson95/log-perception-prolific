@@ -1,3 +1,5 @@
+# estimation ui
+
 library(shiny)
 library(shinyjs)
 library(shinyBS)
@@ -69,7 +71,7 @@ fluidPage(
       condition = "!input.welcome",
       h4("Welcome"),
       helpText(
-        "In this survey points following a trend will be shown.",
+        "In this survey, points following a trend will be shown.",
         "We would like you to provide estimated values for the associated questions."),
       helpText(
         "Finally we would like to collect some information about you.",
@@ -163,7 +165,7 @@ fluidPage(
                      HTML("After winter, bunnies began inhabiting a valley. The bunny population in the valley is illustrated in the graph. We need your help answering a few questions regarding the population of bunnies in the valley."),
                      br(),
                      br(),
-                     img(src = "example-log-drawing.png", width="90%", align = "center"),
+                     img(src = "example-log-drawing.png", width="90%", align = "center")
     ),
     conditionalPanel(condition = "input.welcome && !input.ready",
                      h4(textOutput("demo_text"))
