@@ -369,7 +369,13 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     
                     conditionalPanel(condition = "input.estimation_go",
                                      
-                                     h4("Estimation Sidebar question flow.")
+                        br(),
+                        uiOutput("question_textUI"),
+                        br(),
+                        uiOutput("estimation_action_buttons"),
+                        hr(),
+                        h4("Status"),
+                        h5(textOutput("estimation_status"))
                                      
                                      
                     ) # end you draw it question flow condition (sidebar)
@@ -400,7 +406,19 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This is the question flow
                     conditionalPanel(condition = "input.estimation_go",
                                      
-                        h4("Estimation Study Flow")
+                        br(),
+                        h4(htmlOutput("scenario_text")),
+                        br(),
+                        column(width = 8,
+                          uiOutput("figure")
+                        ),
+                        column(width = 4,
+                          uiOutput("simple_calculator"),
+                          column(width = 12,
+                            verbatimTextOutput("calculation"),
+                            uiOutput("notepad")
+                          )
+                        )
                                      
                     ) # end you draw it question flow condition (main)
                     

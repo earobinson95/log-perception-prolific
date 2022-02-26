@@ -151,6 +151,15 @@ dbDisconnect(con)
 # SETUP STUDY 3: ESTIMATION ----------------------------------------------------
 # ------------------------------------------------------------------------------
 
+# connect to database
+con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+
+estimation_experiment <- dbReadTable(con, "experiment_details")
+estimation_simulated_data  <- dbReadTable(con,"simulated_data")
+estimation_questions <- dbReadTable(con, "estimation_questions")
+scenario_text_data <- dbReadTable(con, "scenario_text_data")
+
+dbDisconnect(con)
 
 # ------------------------------------------------------------------------------
 # BEGIN SERVER -----------------------------------------------------------------
@@ -400,7 +409,378 @@ shinyServer(function(input, output, session) {
       updateCheckboxInput(session, "estimation_go", value = TRUE)
     })
     
-    # ---- Estimation Question Flow -------------------------------------------
+    # ---- Estimation Prep -----------------------------------------------------
+    
+    # Randomization --------------------------------------------------------------
+    # This needs to be run every connection, not just once.
+    
+    estimation_rand <- tibble(
+      dataset = sample(c("dataset1", "dataset2"), 2, replace = F),
+      creature = sample(unique(estimation_questions$qtext[estimation_questions$q_id == "scenario"]), 2, replace = F),
+      scale    = sample(c("linear", "log2"), 2, replace = F)
+    ) 
+    
+    estimation_randomization1 <- estimation_rand[1,] %>%
+      expand_grid(q_id = c("scenario", "Q0", sample(c("QE1", "QE2", "QI1", "QI2", "QI3"), 5)))
+    
+    estimation_randomization2 <- estimation_rand[2,] %>%
+      expand_grid(q_id = c("scenario", "Q0", sample(c("QE1", "QE2", "QI1", "QI2", "QI3"), 5)))
+    
+    estimation_randomization <- rbind(estimation_randomization1, estimation_randomization2) %>%
+      left_join(estimation_questions, by = c("creature", "q_id"))
+    
+    estimation_simulated_data <- estimation_rand %>%
+      right_join(estimation_simulated_data, by = "dataset") %>%
+      mutate(date = ifelse(creature == "tribble", x + 1500, x - 3000))
+    
+    # reactive values to control the trials
+    estimation_values <- reactiveValues(
+      experiment = estimation_experiment$experiment,
+      question   = "",
+      scenario   = as.character(scenario_text_data[scenario_text_data$creature == as.character(estimation_randomization[1, "creature"]), "text"]),
+      qreq       = estimation_experiment$num_qs,
+      qleft      = estimation_experiment$num_qs,
+      qcounter   = 1,
+      trialsreq  = estimation_experiment$trialsreq,
+      trialsleft = NA,
+      
+      submitted = FALSE,
+      starttime = NULL,
+      
+      scale         = as.character(estimation_randomization[1, "scale"]),
+      q_id          = as.character(estimation_randomization[1, "q_id"]),
+      creature_name = as.character(estimation_randomization[1, "creature"]),
+      dataset_id    = as.character(estimation_randomization[1, "dataset"])
+    )
+    
+    # ---- Estimation Question Flow --------------------------------------------
+    
+    output$estimation_action_buttons <- renderUI({
+      
+       if (estimation_values$qcounter <= estimation_values$qreq) {
+        
+         actionButton("estimation_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+        
+      } else if (estimation_values$qcounter > estimation_values$qreq) {
+        
+        actionButton("estimation_study_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+        
+      }
+      
+    })
+    
+    # Enable submit button if the experiment progresses to ___ stage
+    observe({
+      if (is.null(input$response) || input$response == "") {
+        enable("estimation_submit")
+      }
+    })
+    
+    # Saves responses to feedback database
+    observeEvent(input$estimation_submit, {
+      
+      if (estimation_values$qleft > 0 &&
+          (!is.null(input$question_text) && input$question_text != "" && !is.na(input$question_text)) &&
+          estimation_values$q_id != "scenario" &&
+          !any(input$dimension < window_dim_min)) {
+        
+        # Things to do when estimate is given and submitted
+        # disable("submit")
+        
+        estimation_values$result <- "Submitted!"
+        
+        response_data <-    tibble(ip_address      = input$ipid,
+                                   nick_name       = input$nickname,
+                                   study_starttime = study_starttime,
+                                   start_time      = estimation_values$starttime,
+                                   end_time        = now(),
+                                   order           = estimation_values$qcounter,
+                                   q_id            = estimation_values$q_id,
+                                   creature        = estimation_values$creature_name,
+                                   dataset         = estimation_values$dataset_id,
+                                   scale           = estimation_values$scale,
+                                   response        = input$question_text,
+                                   scratchpad      = input$notes
+        )
+        
+        # Write results to database
+        con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+        dbWriteTable(con, "feedback", response_data, append = TRUE, row.names = FALSE)
+        dbDisconnect(con)
+        
+        # Update variables for next question
+        estimation_values$qleft    = estimation_values$qleft - 1
+        estimation_values$qcounter = estimation_values$qcounter + 1
+        
+        estimation_values$creature_name = as.character(estimation_randomization[estimation_values$qcounter, "creature"])
+        estimation_values$dataset_id    = as.character(estimation_randomization[estimation_values$qcounter, "dataset"])
+        estimation_values$scale         = as.character(estimation_randomization[estimation_values$qcounter, "scale"])
+        estimation_values$q_id          = as.character(estimation_randomization[estimation_values$qcounter, "q_id"])
+        estimation_values$scenario      = as.character(scenario_text_data[scenario_text_data == estimation_values$creature_name, "text"])
+        
+        if (estimation_values$qcounter > estimation_values$qreq) { # Generate completion code
+          
+          estimation_values$scenario <- "All done! Congratulations!"
+          #estimation_values$scenario <- paste("All done! Congratulations! Please click the URL to complete the study:")
+          updateCheckboxInput(session, "done", value = TRUE)
+        }
+        
+        estimation_values$submitted <- TRUE
+        
+      } else if (estimation_values$q_id == "scenario") {
+        
+        # Update variables for next question
+        estimation_values$qleft    = estimation_values$qleft - 1
+        estimation_values$qcounter = estimation_values$qcounter + 1
+        estimation_values$result   = NULL
+        
+        estimation_values$creature_name = as.character(estimation_randomization[estimation_values$qcounter, "creature"])
+        estimation_values$scale         = as.character(estimation_randomization[estimation_values$qcounter, "scale"])
+        estimation_values$q_id          = as.character(estimation_randomization[estimation_values$qcounter, "q_id"])
+        estimation_values$scenario      = as.character(scenario_text_data[scenario_text_data == estimation_values$creature_name, "text"])
+        
+        estimation_values$submitted <- TRUE
+        
+      } else {
+        # Don't let them move ahead without answering the question
+        showNotification("Please provide an answer.")
+      }
+    })
+    
+    observeEvent(input$calcEval, {
+      calc_data <-    tibble(ip_address      = input$ipid,
+                             nick_name       = input$nickname,
+                             study_starttime = study_starttime,
+                             q_id            = estimation_values$q_id,
+                             creature        = estimation_values$creature_name,
+                             dataset         = estimation_values$dataset_id,
+                             scale           = estimation_values$scale,
+                             expression      = input$calc,
+                             evaluated       = calculationVals())
+      
+      # Write results to database
+      con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+      dbWriteTable(con, "calc_feedback", calc_data, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
+    })
+    
+    # Output info on which question/page you're on
+    output$estimation_status <- renderText({
+      
+      if (estimation_values$qcounter <= estimation_values$qreq) {
+        
+        paste("Question", estimation_values$qcounter, "of", estimation_values$qreq)
+        
+      }
+      
+    })
+    
+    # This renders the scenario text
+    output$scenario_text <- renderUI({
+      
+      if (estimation_values$q_id == "scenario" || estimation_values$qcounter > estimation_values$qreq) {
+        HTML(estimation_values$scenario)
+      }
+      
+    })
+    
+    # This renders the question text
+    output$question_textUI <- renderUI({
+      input$estimation_submit
+      
+      estimation_values$starttime <- now()
+      
+      # Reset UI selections
+      # estimation_values$submitted    <- FALSE
+      
+      
+      if (estimation_values$qcounter <= estimation_values$qreq) {
+      
+      if (estimation_values$q_id == "Q0") {
+        
+        tagList(
+          textInput("question_text",
+                    estimation_randomization[estimation_values$qcounter, "qtext"],
+                    value = ""),
+          
+          bsTooltip("question_text", "In words, provide a description of the population."),
+          
+        )
+        
+      } else if (estimation_values$q_id != "Q0" && estimation_values$q_id != "scenario") {
+        
+        tagList(
+          numericInput("question_text",
+                       estimation_randomization[estimation_values$qcounter, "qtext"],
+                       value = ""),
+          
+          bsTooltip(id = "question_text", 
+                    title = "Provide a numerical approximation.")
+        )
+        
+      } else if (estimation_values$q_id == "scenario") {
+        
+        helpText(h5(paste("Hit 'Submit' to begin answering questions about the", 
+                          str_to_title(as.character(estimation_randomization[estimation_values$qcounter, "creature"])),
+                          "population.", sep = " "))
+        )
+      }
+        
+      }
+      
+    }) # End Render Question Text
+    
+    # This renders the plot
+    output$data_plot <- renderPlot({
+      
+      # create base scatterplot
+      
+      basePlot <- estimation_simulated_data %>%
+        filter(creature == estimation_values$creature_name) %>%
+        ggplot(aes(x = date, y = y)) +
+        geom_point() +
+        theme_bw() +
+        theme(aspect.ratio = 1,
+              axis.title = element_text(size = 14),
+              axis.text = element_text(size = 12)
+        )
+      
+      if(estimation_values$creature_name == "tribble"){
+        
+        basePlot <- basePlot +
+          scale_x_continuous("Stardate", expand = c(0.01,0.01))
+        
+      } else if (estimation_values$creature_name == "ewok"){
+        
+        basePlot <- basePlot +
+          scale_x_continuous("ABY \n (After the Battle of Yavin)", expand = c(0.01,0.01))
+        
+      }
+      
+      if(estimation_values$scale == "linear"){
+        
+        finalPlot <- basePlot + 
+          scale_y_continuous(paste(str_to_title(estimation_values$creature_name), "Population \n (Linear Scale)"),
+                             limits = c(100, 55000),
+                             breaks = seq(0, 55000, 5000),
+                             labels = comma,
+                             minor_breaks = c())
+        
+      } else if (estimation_values$scale == "log2"){
+        
+        finalPlot <- basePlot + 
+          scale_y_continuous(paste(str_to_title(estimation_values$creature_name), "Population \n (Log Scale)"),
+                             trans = "log2",
+                             limits = c(100, 55000),
+                             breaks = 2^seq(0,10000,1),
+                             labels = comma,
+                             minor_breaks = c())
+        
+      }
+      
+      finalPlot
+      
+    }) # End renderPlot
+    
+    # This outputs either plot or tribble/ewok image
+    output$figure <- renderUI({
+      
+      if (estimation_values$q_id != "scenario" && estimation_values$qcounter <= estimation_values$qreq) {
+        
+        plotOutput("data_plot", height = "500px")
+        
+      } else if (estimation_values$qcounter > estimation_values$qreq) {
+        imagepath <- "ewok-tribble.jpg"
+        tags$figure(
+          div(img(src = imagepath, width="60%"), style="text-align: center"),
+          br(),
+          tags$figcaption("Artwork modified from @allison_horst", style = "text-align: center; color: lightgray"))
+      }
+      
+      else if (estimation_values$q_id == "scenario") {
+        
+        imagepath <- paste(estimation_values$creature_name, ".jpg", sep = "")
+        tags$figure(
+          div(img(src = imagepath, width="60%"), style="text-align: center"),
+          br(),
+          tags$figcaption("Artwork modified from @allison_horst", style = "text-align: center; color: lightgray"))
+        
+      }
+      
+    })
+    
+    output$simple_calculator <- renderUI({
+      input$estimation_submit
+      
+      if (estimation_values$q_id != "scenario" && estimation_values$qcounter <= estimation_values$qreq) {
+        if(estimation_values$q_id != "scenario" && estimation_values$q_id != "Q0") {
+          
+          tagList(
+            
+            helpText(h5("Below are resources for you to use as you are making numerical approximations.")),
+            br(),
+            
+            column(width = 9,
+                   textInput("calc",
+                             "Basic Calculator (e.g. 2 + 2 = 4)",
+                             value = "")),
+            
+            column(width = 3,
+                   actionButton("calcEval", "Evaluate")),
+            
+          )
+        }
+      }
+    })
+    
+    calculationVals <- eventReactive(input$calcEval, {
+      
+      if(!is.null(input$calc) && input$calc != "" & is.numeric(eval(parse(text=input$calc)))) {
+        eval(parse(text=input$calc)) %>% as.character()
+      } else {
+        "Please enter in a valid expression."
+      }
+      
+    })
+    
+    output$calculation <- renderText({
+      input$estimation_submit
+      
+      if (estimation_values$q_id != "scenario" && estimation_values$qcounter <= estimation_values$qreq) {
+        calculationVals()
+      }
+    })
+    
+    output$notepad <- renderUI({
+      input$estimation_submit
+      
+      if (estimation_values$q_id != "scenario" && estimation_values$qcounter <= estimation_values$qreq) {
+        
+        if(estimation_values$q_id != "scenario" && estimation_values$q_id != "Q0") {
+          tagList(
+            textAreaInput("notes", "Scratchpad", "Put scratch-work here...", width = "500px", height = "250px"),
+            # actionButton("examplePopup", "Show Examples", onclick = "window.open('examples-popup.png')")
+            actionButton("examplePopup", "Show Examples")
+          )
+        }
+      }
+    })
+    
+    observeEvent(input$examplePopup, {
+      showModal(modalDialog(
+        includeHTML("www/test.html"),
+        easyClose = TRUE,
+        size = "l"
+      )
+      )
+    })
+    
+    observeEvent(input$estimation_study_complete, {
+      
+        # move to done page
+        updateTabsetPanel(session, "inNavBar",selected = "done-tab")
+      
+    })
     
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
