@@ -22,7 +22,7 @@ library(gridSVG)
 
 # Data Importing and Exporting
 library(readr)
-# library(here)
+library(here)
 library(RSQLite)
 library(DBI)
 sqlite.driver <- dbDriver("SQLite")
@@ -248,40 +248,6 @@ shinyServer(function(input, output, session) {
 # ------------------------------------------------------------------------------
 # STUDY 1: LINEUP --------------------------------------------------------------
 # ------------------------------------------------------------------------------
-  
-  # This needs to be run every connection, not just once.
-  source("code/lineup/randomization.R")
-
-  # reactive lineup_values to control the trials
-  lineup_values <- reactiveValues(
-        experiment = lineups_experiment$experiment,
-        question = lineups_experiment$question,
-        pics = NULL,
-        submitted = FALSE, choice = NULL,
-        reasons = strsplit(lineups_experiment$reasons, ",")[[1]],
-        starttime = NULL,
-        trialsreq = lineups_experiment$trials_req,
-        trialsleft = lineups_experiment$trials_req,
-        lpp = lineups_experiment$lpp,
-        lppleft = lineups_experiment$lpp,
-        pic_id = 0, choice = NULL,
-        correct = NULL, result = "")
-
-    output$debug <- renderText({lineups_experiment$question})
-
-    # Show other text input box if other is selected
-    observe({
-        if (length(lineup_values$reasons) == 1) {
-            updateCheckboxInput(session, "otheronly", value = TRUE)
-            updateTextInput(session, "other", label = "Reason")
-        }
-    })
-
-    # Provide experiment-appropriate reasoning boxes
-    observe({
-        updateCheckboxGroupInput(session, "reasoning",
-                                 choices = lineup_values$reasons, selected = NA)
-    })
 
 # LINEUP EXAMPLES --------------------------------------------------------------
   
@@ -340,10 +306,221 @@ shinyServer(function(input, output, session) {
     
     # LINEUP QUESTION FLOW -----------------------------------------------------
     
-    output$lineups_action_buttons <- renderUI({
-      # actionButton("lineups_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
-      actionButton("lineups_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+    # This needs to be run every connection, not just once.
+    source("code/lineup/randomization.R")
+    
+    # reactive lineup_values to control the trials
+    lineup_values <- reactiveValues(
+      experiment = lineups_experiment$experiment,
+      question = lineups_experiment$question,
+      pics = NULL,
+      submitted = FALSE, choice = NULL,
+      reasons = strsplit(lineups_experiment$reasons, ",")[[1]],
+      starttime = NULL,
+      trialsreq = lineups_experiment$trials_req,
+      trialsleft = lineups_experiment$trials_req,
+      lpp = lineups_experiment$lpp,
+      lppleft = lineups_experiment$lpp,
+      pic_id = 0, choice = NULL,
+      correct = NULL, result = "")
+    
+    # output$debug <- renderText({lineups_experiment$question})
+    
+    # Show other text input box if other is selected
+    observe({
+      if (length(lineup_values$reasons) == 1) {
+        updateCheckboxInput(session, "otheronly", value = TRUE)
+        updateTextInput(session, "other", label = "Reason")
+      }
     })
+    
+    # Provide experiment-appropriate reasoning boxes
+    observe({
+      updateCheckboxGroupInput(session, "reasoning",
+                               choices = lineup_values$reasons, selected = NA)
+    })
+    
+    output$lineups_action_buttons <- renderUI({
+      if(lineup_values$lppleft > 0) {
+      actionButton("lineups_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+      } else {
+      actionButton("lineups_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+      }    
+    })
+    
+    output$lineups_question <- renderText({
+      return(lineup_values$question)
+    })
+    
+    # Output info on how many trials/lineups left
+    output$lineups_status <- renderText({
+      paste(
+        ifelse(lineup_values$trialsleft > 0, "Trial", ""),
+        "Plot",
+        ifelse(lineup_values$trialsleft > 0,
+               paste(lineup_values$trialsreq - lineup_values$trialsleft + 1, "of", lineup_values$trialsreq),
+               paste(lineup_values$lpp - lineup_values$lppleft + 1, "of", lineup_values$lpp)))
+    })
+    
+    # Enable submit button if the experiment progresses to ___ stage
+    observe({
+      if (is.null(input$response_no) || input$response_no == "") {
+        enable("lineups_submit")
+      }
+    })
+    
+    observeEvent(input$lineups_submit, {
+      response <- as.character(input$response_no)
+      
+      
+      if (nchar(response) > 0 &&
+          all(strsplit(response, ",")[[1]] %in% 1:20) &&
+          lineup_values$lppleft > 0 &&
+          (length(input$reasoning) > 0 || (nchar(input$other) > 0)) &&
+          nchar(input$certain) > 0 &&
+          !any(input$dimension < window_dim_min)) {
+        
+        # Things to do when responses are all filled in and submitted
+        disable("lineups_submit")
+        
+        reason <- input$reasoning
+        if ("Other" %in% reason || input$otheronly) {
+          reason <- c(reason, input$other)
+        }
+        reason <- paste(reason, collapse = ", ")
+        
+        lineup_values$choice <- response
+        
+        if (lineup_values$trialsleft == 0 && lineup_values$lppleft > 0) {
+          # This applies to the lineups, not to the trials
+          lineup_values$result <- "Submitted!"
+          
+          test <- data.frame(ip_address = input$ipid, nick_name = input$nickname,
+                             start_time = lineup_values$starttime, end_time = now(),
+                             pic_id = lineup_values$pic_id,
+                             response_no = lineup_values$choice,
+                             conf_level = input$certain,
+                             choice_reason = reason,
+                             description = lineup_values$experiment)
+          
+          # Write results to database
+          con <- dbConnect(SQLite(), dbname = "databases/01_lineups_db.db")
+          dbWriteTable(con, "feedback", test, append = TRUE, row.names = FALSE)
+          dbDisconnect(con)
+          
+          # Update variables for next trial
+          lineup_values$lppleft <- lineup_values$lppleft - 1
+          lineup_values$choice <- ""
+          
+          # Generate completion code
+          if (lineup_values$lppleft == 0) {
+            lineup_values$question <- "Study 1 Complete! Hit continue to move to the next study."
+          }
+          
+        } else {
+          # This applies to the trials, not the lineups
+          if (any(strsplit(lineup_values$choice, ",")[[1]] %in% lineup_values$correct)) {
+            lineup_values$trialsleft <- lineup_values$trialsleft - 1
+            lineup_values$result <- "Correct! :)"
+          } else {
+            lineup_values$result <- "Incorrect :("
+          }
+        }
+        
+        lineup_values$submitted <- TRUE
+      } else {
+        # Don't let them move ahead without doing the trial
+        showNotification("Please fill in all of the boxes.")
+      }
+    })
+    
+    # This renders the trial/lineup image
+    output$lineup <- renderUI({
+      if (lineup_values$lppleft == 0 || any(input$dimension < window_dim_min)) return(NULL)
+      
+      withProgress(
+        # Message: Loading (trial) plot i of n
+        message = paste(lineup_values$result, "Loading",
+                        ifelse(lineup_values$trialsleft > 0, "trial", ""), "plot",
+                        ifelse(lineup_values$trialsleft > 0,
+                               paste(lineup_values$trialsreq - lineup_values$trialsleft + 1, "of", lineup_values$trialsreq),
+                               paste(lineup_values$lpp - lineup_values$lppleft + 1, "of", lineup_values$lpp))),
+        expr = {
+          lineup_values$submitted
+          
+          lineup_values$starttime <- now()
+          trial <- as.numeric(lineup_values$trialsleft > 0)
+          
+          plotpath <- ifelse(lineup_values$trialsleft > 0, "trials", "plots")
+          
+          con <- dbConnect(SQLite(), dbname = "databases/01_lineups_db.db")
+          
+          # I suspect this logic could be improved with dbplyr...
+          if (trial == 0 && is.null(lineup_values$pics)) {
+            # Create order of trials
+            orderby <- paste0("ORDER BY CASE pic_id ",
+                              paste("WHEN", pic_ids, "THEN", 0:(lineup_values$lpp - 1), collapse = " "),
+                              " END")
+            # Get picture details
+            lineup_values$pics <- dbGetQuery(
+              con, paste0("SELECT * FROM picture_details WHERE experiment = '", lineup_values$experiment,
+                          "' AND trial = ", trial, " AND pic_id IN (", paste(pic_ids, collapse = ","), ") ",
+                          orderby))
+            
+            nextplot <- lineup_values$pics[1,]
+          } else if (trial == 0 && !is.null(lineup_values$pics)) {
+            nextplot <- lineup_values$pics[lineup_values$lpp - lineup_values$lppleft + 1,]
+          } else if (trial == 1 && is.null(lineup_values$trial_pics)) {
+            # Get trial pictures
+            orderby <- paste0("ORDER BY CASE pic_id ",
+                              paste("WHEN", trial_pic_ids, "THEN", 0:(length(trial_pic_ids) - 1), collapse = " "),
+                              " END")
+            lineup_values$trial_pics <- dbGetQuery(
+              con, paste0("SELECT * FROM picture_details WHERE experiment = '", lineup_values$experiment,
+                          "' AND trial = ", trial, " AND pic_id IN (", paste(trial_pic_ids, collapse = ","), ") ",
+                          orderby))
+            nextplot <- lineup_values$trial_pics[1,]
+          } else if (trial == 1 && !is.null(lineup_values$trial_pics)) {
+            nextplot <- lineup_values$trial_pics[lineup_values$trialsreq - lineup_values$trialsleft + 1,]
+          }
+          
+          dbDisconnect(con)
+          
+          # Update reactive values
+          lineup_values$pic_id <- nextplot$pic_id
+          lineup_values$correct <- strsplit(as.character(nextplot$obs_plot_location), ",")[[1]]
+          
+          # Reset UI selections
+          lineup_values$submitted <- FALSE
+          
+          updateSelectizeInput(
+            session, "certain",
+            choices = c("", "Very Uncertain", "Uncertain", "Neutral", "Certain", "Very Certain"),
+            selected = NULL)
+          updateTextInput(session, "response_no", value = "")
+          updateTextInput(session, "other", value = "")
+          updateCheckboxGroupInput(session, "reasoning", selected = NA)
+          
+          if (is.null(nextplot$pic_name)) return(NULL)
+          
+          # Read svg and remove width/height
+          tmp <- readLines(file.path(plotpath, "svg", basename(nextplot$pic_name)))
+          tmp[2] <- str_replace(tmp[2], "width=.*? height=.*? viewBox", "viewBox")
+          
+          # Include the picture
+          div(
+            class="full-lineup-container",
+            HTML(tmp)
+          )
+          
+          # div(
+          #     class = "full-lineup-container",
+          #     img(src = file.path(plotpath, "svg", basename(nextplot$pic_name)),
+          #         style = "max-width:100%; max-height = 100%")
+          # )
+          
+        }) # end WithProgress
+    }) # end renderUI
     
     
     # Move to You Draw It Study 
@@ -448,13 +625,9 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$you_draw_it_submit, {
-      # response <- as.character(input$response_no)
       
       if (
-        # nchar(response) > 0 &&
-        # all(strsplit(response, ",")[[1]] %in% 1:20) &&
         you_draw_it_values$ydippleft > 0 &&
-        # (length(input$reasoning) > 0 || (nchar(input$other) > 0)) &&
         you_draw_it_values$done_drawing &&
         !any(input$dimension < window_dim_min)) {
         
@@ -659,7 +832,7 @@ shinyServer(function(input, output, session) {
 # ------------------------------------------------------------------------------
 
     
-    # ---- You Draw It Examples ------------------------------------------------
+    # ---- Estimation Examples -------------------------------------------------
     
     output$estimation_text <- renderUI({
       HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
@@ -735,11 +908,11 @@ shinyServer(function(input, output, session) {
     })
     
     # Enable submit button if the experiment progresses to ___ stage
-    observe({
-      if (is.null(input$response) || input$response == "") {
-        enable("estimation_submit")
-      }
-    })
+    # observe({
+    #   if (is.null(input$estimation_response) || input$estimation_response == "") {
+    #     enable("estimation_submit")
+    #   }
+    # })
     
     # Saves responses to feedback database
     observeEvent(input$estimation_submit, {

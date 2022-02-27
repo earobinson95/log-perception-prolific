@@ -218,6 +218,9 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         # selectizeInput("response_no", "Choice", choices = 1:20, selected = NULL, multiple = T),
                                      
                         # Handle other reasoning logic
+                        conditionalPanel(condition = "input.response_no == null",
+                          checkboxInput("otheronly", "", value = FALSE)
+                        ),
                         conditionalPanel(condition = "!input.otheronly",
                                          checkboxGroupInput("reasoning", "Reasoning", choices = "")
                         ),
@@ -232,7 +235,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         uiOutput("lineups_action_buttons"), 
                         hr(),
                         h4("Status"),
-                        h5(textOutput("lineup_status"))
+                        h5(textOutput("lineups_status"))
                         
                     ) # end lineup question flow condition (sidebar)
                     
@@ -267,7 +270,9 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This is the question flow
                     conditionalPanel(condition = "input.lineups_go",
                                      
-                        h4("Lineup plot goes here.")
+                      h3(textOutput("lineups_question")),
+                      hr(),
+                      uiOutput("lineup", inline = T)
                                      
                     ) # end lineup question flow condition (main)
                     
