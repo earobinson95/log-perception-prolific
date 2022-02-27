@@ -324,16 +324,6 @@ shinyServer(function(input, output, session) {
       pic_id = 0, choice = NULL,
       correct = NULL, result = "")
     
-    # output$debug <- renderText({lineups_experiment$question})
-    
-    # Show other text input box if other is selected
-    observe({
-      if (length(lineup_values$reasons) == 1) {
-        updateCheckboxInput(session, "otheronly", value = TRUE)
-        updateTextInput(session, "other", label = "Reason")
-      }
-    })
-    
     # Provide experiment-appropriate reasoning boxes
     observe({
       updateCheckboxGroupInput(session, "reasoning",
@@ -384,7 +374,7 @@ shinyServer(function(input, output, session) {
         disable("lineups_submit")
         
         reason <- input$reasoning
-        if ("Other" %in% reason || input$otheronly) {
+        if ("Other" %in% reason) {
           reason <- c(reason, input$other)
         }
         reason <- paste(reason, collapse = ", ")
@@ -499,7 +489,7 @@ shinyServer(function(input, output, session) {
             selected = NULL)
           updateTextInput(session, "response_no", value = "")
           updateTextInput(session, "other", value = "")
-          updateCheckboxGroupInput(session, "reasoning", selected = NA)
+          updateCheckboxGroupInput(session, "reasoning", selected = "")
           
           if (is.null(nextplot$pic_name)) return(NULL)
           

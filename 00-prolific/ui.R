@@ -217,14 +217,9 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         textInput("response_no", "Choice", value = "", placeholder = "Click the plot to select"),
                         # selectizeInput("response_no", "Choice", choices = 1:20, selected = NULL, multiple = T),
                                      
-                        # Handle other reasoning logic
-                        conditionalPanel(condition = "input.response_no == null",
-                          checkboxInput("otheronly", "", value = FALSE)
-                        ),
-                        conditionalPanel(condition = "!input.otheronly",
-                                         checkboxGroupInput("reasoning", "Reasoning", choices = "")
-                        ),
-                        conditionalPanel(condition = "input.reasoning.indexOf('Other') > -1 || input.otheronly",
+                        # Show other text input box if other is selected
+                        checkboxGroupInput("reasoning", "Reasoning", choices = ""),
+                        conditionalPanel(condition = "input.reasoning.indexOf('Other') > -1",
                                          textInput("other", "Other Reason")
                         ),
                                      
