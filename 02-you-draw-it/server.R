@@ -130,7 +130,7 @@ addResourcePath("examples", "examples")
 # trials_folder <- "trials" # subfolders for svg. picture_details_trial.csv in this folder
 
 
-window_dim_min <- c(800, 600) # width, height
+window_dim_min <- 600 #c(800, 600) # width, height
 
 con <- dbConnect(sqlite.driver, dbname = "you_draw_it_data.db")
 experiment <- dbReadTable(con, "experiment_details")

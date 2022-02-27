@@ -48,7 +48,7 @@ lineups_experiment_name <- "emily-log-1"
 plots_folder <- "plots" # subfolders for data, pdf, png, svg. picture_details.csv in this folder
 trials_folder <- "trials" # subfolders for svg. picture_details_trial.csv in this folder
 
-con <- dbConnect(SQLite(), dbname = "databases/01_lineups_data.db")
+con <- dbConnect(SQLite(), dbname = "databases/01_lineups_db.db")
 lineups_experiment <- dbReadTable(con, "experiment_details")
 dbDisconnect(con)
 
@@ -143,7 +143,7 @@ drawr <- function(data,
 
 you_draw_it_experiment_name <- "emily-log-you-draw-it-pilot-app"
 
-con <- dbConnect(sqlite.driver, dbname = "databases/02_you_draw_it_data.db")
+con <- dbConnect(sqlite.driver, dbname = "databases/02_you_draw_it_db.db")
 you_draw_it_experiment <- dbReadTable(con, "experiment_details")
 dbDisconnect(con)
 
@@ -152,7 +152,7 @@ dbDisconnect(con)
 # ------------------------------------------------------------------------------
 
 # connect to database
-con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_db.db")
 
 estimation_experiment <- dbReadTable(con, "experiment_details")
 estimation_simulated_data  <- dbReadTable(con,"simulated_data")
@@ -167,7 +167,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -402,11 +402,251 @@ shinyServer(function(input, output, session) {
     # ---- You Draw It Question Flow -------------------------------------------
     
     output$you_draw_it_action_buttons <- renderUI({
+      
+      if (you_draw_it_values$ydippleft > 0) {
+        actionButton("you_draw_it_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+      } else {
         actionButton("you_draw_it_study_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
+      }
     })
     
+    output$you_draw_it_question <- renderText({
+      return(you_draw_it_values$question)
+    })
     
+    output$isPractice <- reactive({
+      you_draw_it_values$practiceleft > 0
+    })
+    outputOptions(output, 'isPractice', suspendWhenHidden = FALSE)
     
+    output$you_draw_it_practicetext <- renderText({
+      return(you_draw_it_values$practicetext)
+    })
+    
+    output$you_draw_it_practicegif <- renderImage({
+      # Return a list
+      list(src = you_draw_it_values$practicegif_file,
+           alt = "",
+           width = 350)
+    }, deleteFile = FALSE)
+    
+    # Output info on how many practices/you draw it tasks left
+    output$you_draw_it_status <- renderText({
+      paste(
+        ifelse(you_draw_it_values$practiceleft > 0, "Practice", ""),
+        "Plot",
+        ifelse(you_draw_it_values$practiceleft > 0,
+               paste(you_draw_it_values$practicereq - you_draw_it_values$practiceleft + 1, "of", you_draw_it_values$practicereq),
+               paste(you_draw_it_values$ydipp - you_draw_it_values$ydippleft + 1, "of", you_draw_it_values$ydipp)))
+    })
+    
+    # Enable submit button if the experiment progresses to ___ stage
+    observe({
+      if (!(you_draw_it_values$done_drawing)) {
+        enable("you_draw_it_submit")
+      }
+    })
+    
+    observeEvent(input$you_draw_it_submit, {
+      # response <- as.character(input$response_no)
+      
+      if (
+        # nchar(response) > 0 &&
+        # all(strsplit(response, ",")[[1]] %in% 1:20) &&
+        you_draw_it_values$ydippleft > 0 &&
+        # (length(input$reasoning) > 0 || (nchar(input$other) > 0)) &&
+        you_draw_it_values$done_drawing &&
+        !any(input$dimension < window_dim_min)) {
+        
+        # Things to do when you draw it line is finished and submitted
+        disable("you_draw_it_submit")
+        
+        if (you_draw_it_values$practiceleft == 0 && you_draw_it_values$ydippleft > 0) {
+          # This applies to the you draw it plots, not to the practices
+          you_draw_it_values$result <- "Submitted!"
+          
+          test <- drawn_data() %>%
+            mutate(ip_address = input$ipid,
+                   nick_name = input$nickname,
+                   study_starttime = study_starttime,
+                   start_time = you_draw_it_values$starttime,
+                   end_time = now(),
+                   parm_id = as.character(parm_id)
+            )
+          
+          # Write results to database
+          con <- dbConnect(sqlite.driver, dbname = "databases/02_you_draw_it_db.db")
+          dbWriteTable(con, "feedback", test, append = TRUE, row.names = FALSE)
+          dbDisconnect(con)
+          
+          # Update variables for next trial
+          you_draw_it_values$ydippleft <- you_draw_it_values$ydippleft - 1
+          you_draw_it_values$choice <- ""
+          
+          # Generate completion code
+          if (you_draw_it_values$ydippleft == 0) {
+            
+            you_draw_it_values$question <- "Study 2 Complete! Hit continue to move to the next study."
+            #you_draw_it_values$question <- paste("All done! Congratulations! Please click the URL to complete the study:")
+            # updateCheckboxInput(session, "done", value = TRUE)
+          }
+          
+        } else {
+          # This applies to the practices, not the you draw it's
+          you_draw_it_values$practiceleft <- you_draw_it_values$practiceleft - 1
+        }
+        
+        you_draw_it_values$submitted <- TRUE
+      } else {
+        # Don't let them move ahead without doing the trial
+        showNotification("Please finish drawing the trend for the entire yellow box region.")
+      }
+    })
+    
+    # Create storage for response values
+    message_loc <- session$ns("drawr_message")
+    drawn_data <- shiny::reactiveVal()
+    line_data_storage <- shiny::reactiveVal()
+    done_drawing  <- shiny::reactiveVal()
+    
+    # This renders the you draw it graph
+    output$shinydrawr <- r2d3::renderD3({
+      if (you_draw_it_values$ydippleft == 0 || any(input$dimension < window_dim_min)) return(NULL)
+      input$reset
+      
+      withProgress(
+        # Message: Loading (trial) plot i of n
+        message = paste(you_draw_it_values$result, "Loading",
+                        ifelse(you_draw_it_values$practiceleft > 0, "trial", ""), "plot",
+                        ifelse(you_draw_it_values$practiceleft > 0,
+                               paste(you_draw_it_values$practicereq - you_draw_it_values$practiceleft + 1, "of", you_draw_it_values$practicereq),
+                               paste(you_draw_it_values$ydipp - you_draw_it_values$ydippleft + 1, "of", you_draw_it_values$ydipp))),
+        expr = {
+          you_draw_it_values$submitted
+          
+          you_draw_it_values$starttime <- now()
+          trial <- as.numeric(you_draw_it_values$practiceleft > 0)
+          
+          # Reset UI selections
+          you_draw_it_values$submitted    <- FALSE
+          you_draw_it_values$done_drawing <- FALSE
+          
+          # This part applies to only the practice rounds
+          if(you_draw_it_values$practiceleft > 0){
+            # Update reactive values
+            practiceID <- (you_draw_it_values$practicereq - you_draw_it_values$practiceleft + 1)
+            
+            # Obtain Parameters & Data
+            you_draw_it_values$practicetext  <- practice_text[practiceID] %>% as.character()
+            you_draw_it_values$practicegif_file  <- practicegif_files[practiceID] %>% as.character()
+            isLinear     <- practice_data[practiceID, "linear"] %>% as.character()
+            isFreeDraw   <- practice_data[practiceID, "free_draw"] %>% as.logical()
+            drawStart    <- practice_data[practiceID, "draw_start"] %>% as.numeric()
+            showFinished <- practice_data[practiceID, "show_finished"] %>% as.logical()
+            
+            point_data <- practice_data[practiceID,] %>%
+              unnest(data) %>%
+              filter(dataset == "point_data")
+            
+            line_data <- practice_data[practiceID,] %>%
+              unnest(data) %>%
+              filter(dataset == "line_data")
+            
+            data <- list(point_data = point_data, line_data = line_data)
+            
+            # Set up ranges
+            y_range <- c(min(data$point_data[,"y"]), max(max(data$point_data[,"y"]), max(data$line_data[,"y"]))) * c(0.5, 1.5)
+            x_range <- c(0,20)
+            
+            # Include the you draw it graph
+            drawr(data              = data,
+                  aspect_ratio      = 1,
+                  linear            = isLinear,
+                  free_draw         = isFreeDraw,
+                  points            = "full",
+                  x_by              = 0.25,
+                  draw_start        = drawStart,
+                  # points_end        = 0.5,
+                  show_finished     = showFinished,
+                  shiny_message_loc = message_loc,
+                  x_range           = x_range,
+                  y_range           = y_range)
+            
+          } else {
+            # This part applies to only the you draw it's, not the practice rounds
+            # Update reactive values
+            taskID <- (you_draw_it_values$ydipp - you_draw_it_values$ydippleft + 1)
+            
+            # Obtain Parameters & Data
+            isLinear   <- simulated_data[taskID, "linear"] %>% as.character()
+            isFreeDraw <- simulated_data[taskID, "free_draw"] %>% as.logical()
+            drawStart  <- simulated_data[taskID, "draw_start"] %>% as.numeric()
+            
+            point_data <- simulated_data[taskID,] %>%
+              unnest(data) %>%
+              filter(dataset == "point_data")
+            
+            line_data <- simulated_data[taskID,] %>%
+              unnest(data) %>%
+              filter(dataset == "line_data")
+            
+            data <- list(point_data = point_data, line_data = line_data)
+            
+            if(isFreeDraw){
+              
+              # Store data for feedback later
+              line_data %>%
+                select(parm_id, linear, x, y) %>%
+                line_data_storage()
+              
+              # Set up ranges
+              y_range <- eyefitting_yrange * c(1.1, 1.1)
+              x_range <- c(0,20)
+              
+            } else {
+              
+              # Store data for feedback later
+              line_data %>%
+                select(parm_id, linear, x, y) %>%
+                filter(x >= drawStart) %>%
+                line_data_storage()
+              
+              # Set up ranges
+              y_range <- range(data$line_data[,"y"]) * c(0.5, 2)
+              x_range <- range(data$line_data[,"x"])
+            }
+            
+            # Include the you draw it graph
+            drawr(data              = data,
+                  aspect_ratio      = 1,
+                  linear            = isLinear,
+                  free_draw         = isFreeDraw,
+                  points            = "full",
+                  x_by              = 0.25,
+                  draw_start        = drawStart,
+                  # points_end        = 0.5,
+                  show_finished     = FALSE,
+                  shiny_message_loc = message_loc,
+                  x_range           = x_range,
+                  y_range           = y_range)
+          }
+        })
+    }) # end renderD3
+    
+    shiny::observeEvent(input$drawr_message, {
+      
+      you_draw_it_values$done_drawing <- TRUE
+      
+      if(you_draw_it_values$practiceleft == 0){
+        line_data <- line_data_storage()
+        
+        line_data %>%
+          mutate(ydrawn = input$drawr_message) %>%
+          select(parm_id, x, y, ydrawn, linear) %>%
+          drawn_data()
+      }
+      
+    })
     
     # move to estimation study
     observeEvent(input$you_draw_it_study_complete, {
@@ -529,7 +769,7 @@ shinyServer(function(input, output, session) {
         )
         
         # Write results to database
-        con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+        con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_db.db")
         dbWriteTable(con, "feedback", response_data, append = TRUE, row.names = FALSE)
         dbDisconnect(con)
         
@@ -547,7 +787,7 @@ shinyServer(function(input, output, session) {
           
           estimation_values$scenario <- "Study 3 Complete! Hit continue to recieve your Prolific confirmation code."
           #estimation_values$scenario <- paste("All done! Congratulations! Please click the URL to complete the study:")
-          updateCheckboxInput(session, "done", value = TRUE)
+          # updateCheckboxInput(session, "done", value = TRUE)
         }
         
         estimation_values$submitted <- TRUE
@@ -584,7 +824,7 @@ shinyServer(function(input, output, session) {
                              evaluated       = calculationVals())
       
       # Write results to database
-      con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_data.db")
+      con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_db.db")
       dbWriteTable(con, "calc_feedback", calc_data, append = TRUE, row.names = FALSE)
       dbDisconnect(con)
     })

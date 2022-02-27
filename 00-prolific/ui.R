@@ -308,9 +308,14 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     
                     conditionalPanel(condition = "input.you_draw_it_go",
                                      
-                        h4("You Draw It Sidebar question flow."),
+                        # checkboxInput("show_finished", "Show Finished?", value = T),
                         br(),
-                        uiOutput("you_draw_it_action_buttons")           
+                        actionButton("reset", "Reset"),
+                        hr(),
+                        uiOutput("you_draw_it_action_buttons"),
+                        hr(),
+                        h4("Status"),
+                        h5(textOutput("you_draw_it_status"))        
                                      
                                      
                     ) # end you draw it question flow condition (sidebar)
@@ -334,7 +339,17 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     # This is the question flow
                     conditionalPanel(condition = "input.you_draw_it_go",
                           
-                                     h4("You Draw It Study Flow")
+                        h3(textOutput("you_draw_it_question")),
+                        conditionalPanel(condition = "output.isPractice",
+                            h5(textOutput("you_draw_it_practicetext"))
+                        ),
+                        hr(),
+                        fluidRow(
+                          conditionalPanel(condition = "output.isPractice",
+                              column(width = 4, imageOutput("you_draw_it_practicegif")),
+                          ),
+                          column(width = 8, d3Output("shinydrawr", height = "500px"))
+                        )
                                      
                     ) # end you draw it question flow condition (main)
                     
