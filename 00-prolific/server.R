@@ -309,7 +309,7 @@ shinyServer(function(input, output, session) {
     
     # This needs to be run every connection, not just once.
     source("code/lineup/randomization.R")
-    
+
     # reactive lineup_values to control the trials
     lineup_values <- reactiveValues(
       experiment = lineups_experiment$experiment,
@@ -322,18 +322,35 @@ shinyServer(function(input, output, session) {
       trialsleft = lineups_experiment$trials_req,
       lpp = lineups_experiment$lpp,
       lppleft = lineups_experiment$lpp,
-      pic_id = 0, choice = NULL,
-      correct = NULL, result = "")
+      pic_id = 0,
+      param_value = "",
+      set = NA,
+      scale = "",
+      choice = NULL,
+      order = NA,
+      correct = NULL, 
+      result = "")
     
     # Provide experiment-appropriate reasoning boxes
-    observe({
-      updateCheckboxGroupInput(session, "reasoning",
-                               choices = lineup_values$reasons, selected = NA)
-    })
-    
     output$lineups_action_buttons <- renderUI({
       if(lineup_values$lppleft > 0) {
-      actionButton("lineups_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+        tagList(
+            h4("Selection"),
+            textInput("response_no", "Choice", value = "", placeholder = "Click the plot to select"),
+   
+            # Show other text input box if other is selected
+            checkboxGroupInput("reasoning", "Reasoning", choices = lineup_values$reasons, selected = NA),
+            conditionalPanel(condition = "input.reasoning.indexOf('Other') > -1",
+                             textInput("other", "Other Reason")
+            ),
+            selectizeInput("certain", "How certain are you?",
+                           choices = c("", "Very Uncertain", "Uncertain",
+                                       "Neutral", "Certain", "Very Certain")),
+            br(),
+            actionButton("lineups_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info") ,
+            hr(),
+            h4("Status")
+        )
       } else {
       actionButton("lineups_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
       }    
@@ -345,12 +362,15 @@ shinyServer(function(input, output, session) {
     
     # Output info on how many trials/lineups left
     output$lineups_status <- renderText({
-      paste(
-        ifelse(lineup_values$trialsleft > 0, "Trial", ""),
-        "Plot",
-        ifelse(lineup_values$trialsleft > 0,
-               paste(lineup_values$trialsreq - lineup_values$trialsleft + 1, "of", lineup_values$trialsreq),
-               paste(lineup_values$lpp - lineup_values$lppleft + 1, "of", lineup_values$lpp)))
+      
+      if(lineup_values$lppleft > 0) {
+        paste(
+          ifelse(lineup_values$trialsleft > 0, "Trial", ""),
+          "Plot",
+          ifelse(lineup_values$trialsleft > 0,
+                 paste(lineup_values$trialsreq - lineup_values$trialsleft + 1, "of", lineup_values$trialsreq),
+                 paste(lineup_values$lpp - lineup_values$lppleft + 1, "of", lineup_values$lpp)))
+      }
     })
     
     # Enable submit button if the experiment progresses to ___ stage
@@ -390,9 +410,14 @@ shinyServer(function(input, output, session) {
                                         nick_name       = input$nickname,
                                         study_starttime = study_starttime,
                                         prolific_id     = input$prolificID %>% as.character(),
+                                        order           = lineup_values$order,
                                         start_time      = lineup_values$starttime, 
                                         end_time        = now(),
                                         pic_id          = lineup_values$pic_id,
+                                        param_value     = lineup_values$param_value,
+                                        set             = lineup_values$set,
+                                        test_param      = lineup_values$scale,
+                                        correct         = lineup_values$correct,
                                         response_no     = lineup_values$choice,
                                         conf_level      = input$certain,
                                         choice_reason   = reason
@@ -442,48 +467,17 @@ shinyServer(function(input, output, session) {
                                paste(lineup_values$lpp - lineup_values$lppleft + 1, "of", lineup_values$lpp))),
         expr = {
           lineup_values$submitted
-          
           lineup_values$starttime <- now()
-          trial <- as.numeric(lineup_values$trialsleft > 0)
           
-          plotpath <- ifelse(lineup_values$trialsleft > 0, "trials", "plots")
-          
-          con <- dbConnect(SQLite(), dbname = "databases/01_lineups_db.db")
-          
-          # I suspect this logic could be improved with dbplyr...
-          if (trial == 0 && is.null(lineup_values$pics)) {
-            # Create order of trials
-            orderby <- paste0("ORDER BY CASE pic_id ",
-                              paste("WHEN", pic_ids, "THEN", 0:(lineup_values$lpp - 1), collapse = " "),
-                              " END")
-            # Get picture details
-            lineup_values$pics <- dbGetQuery(
-              con, paste0("SELECT * FROM picture_details WHERE experiment = '", lineup_values$experiment,
-                          "' AND trial = ", trial, " AND pic_id IN (", paste(pic_ids, collapse = ","), ") ",
-                          orderby))
-            
-            nextplot <- lineup_values$pics[1,]
-          } else if (trial == 0 && !is.null(lineup_values$pics)) {
-            nextplot <- lineup_values$pics[lineup_values$lpp - lineup_values$lppleft + 1,]
-          } else if (trial == 1 && is.null(lineup_values$trial_pics)) {
-            # Get trial pictures
-            orderby <- paste0("ORDER BY CASE pic_id ",
-                              paste("WHEN", trial_pic_ids, "THEN", 0:(length(trial_pic_ids) - 1), collapse = " "),
-                              " END")
-            lineup_values$trial_pics <- dbGetQuery(
-              con, paste0("SELECT * FROM picture_details WHERE experiment = '", lineup_values$experiment,
-                          "' AND trial = ", trial, " AND pic_id IN (", paste(trial_pic_ids, collapse = ","), ") ",
-                          orderby))
-            nextplot <- lineup_values$trial_pics[1,]
-          } else if (trial == 1 && !is.null(lineup_values$trial_pics)) {
-            nextplot <- lineup_values$trial_pics[lineup_values$trialsreq - lineup_values$trialsleft + 1,]
-          }
-          
-          dbDisconnect(con)
+          this_picture <- picture_details_order[lineup_values$lpp - lineup_values$lppleft + 1, ]
           
           # Update reactive values
-          lineup_values$pic_id <- nextplot$pic_id
-          lineup_values$correct <- strsplit(as.character(nextplot$obs_plot_location), ",")[[1]]
+          lineup_values$pic_id       <- this_picture$pic_id
+          lineup_values$order        <- this_picture$order
+          lineup_values$param_value <- this_picture$param_value
+          lineup_values$set         <- this_picture$set
+          lineup_values$scale       <- this_picture$test_param
+          lineup_values$correct      <- this_picture$obs_plot_location
           
           # Reset UI selections
           lineup_values$submitted <- FALSE
@@ -496,10 +490,8 @@ shinyServer(function(input, output, session) {
           updateTextInput(session, "other", value = "")
           updateCheckboxGroupInput(session, "reasoning", selected = "")
           
-          if (is.null(nextplot$pic_name)) return(NULL)
-          
           # Read svg and remove width/height
-          tmp <- readLines(file.path(plotpath, "svg", basename(nextplot$pic_name)))
+          tmp <- readLines(file.path(this_picture$pic_name))
           tmp[2] <- str_replace(tmp[2], "width=.*? height=.*? viewBox", "viewBox")
           
           # Include the picture
@@ -508,13 +500,8 @@ shinyServer(function(input, output, session) {
             HTML(tmp)
           )
           
-          # div(
-          #     class = "full-lineup-container",
-          #     img(src = file.path(plotpath, "svg", basename(nextplot$pic_name)),
-          #         style = "max-width:100%; max-height = 100%")
-          # )
-          
         }) # end WithProgress
+      
     }) # end renderUI
     
     

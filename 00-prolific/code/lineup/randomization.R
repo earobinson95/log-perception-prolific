@@ -31,8 +31,10 @@ rorschach_block_ids <- tibble(param_id = sample(1:length(unique_rorschach_values
   mutate(param_value = unique_rorschach_values[param_id],
          set  = sample(1:num_sets,rorschach_values_per_participant*2, replace = T))
 
-block_ids <- rbind(param_block_ids, rorschach_block_ids[sample(1:2,1),])
+block_ids <- rbind(param_block_ids, rorschach_block_ids[sample(1:2,1),]) %>%
+  mutate(order = sample(1:13, 13, replace = F)) %>%
+  arrange(order)
 
 joinCols = c("test_param", "param_value", "set")
-pic_ids <- sample(right_join(picture_details_randomization, block_ids, by = joinCols)$pic_id, 2*(param_values_per_participant) + rorschach_values_per_participant)
-trial_pic_ids <- sample(1:10, size = 2)
+picture_details_order <- left_join(block_ids, picture_details_randomization, by = joinCols)
+

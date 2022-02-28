@@ -18,31 +18,36 @@ dbListTables(db_con)
 # Experiment Details -----------------------------------------------------------
 
 experiment_details <- dbReadTable(db_con,"experiment_details")
-# experiment_details <- tibble(experiment = "emily-log2",
-#                             question   = "Which plot is the most different?",
-#                             reasons    = "Clustering, Different range Different shape, Different slope, Outlier(s), Other",
-#                             lpp        = 13,
-#                             trials_req = 0
-#                             )
-# dbRemoveTable(db_con, "experiment_details")
-# dbWriteTable(db_con, "experiment_details", experiment_details)
-# experiment_details <- dbReadTable(db_con,"experiment_details")
+experiment_details <- tibble(experiment = "emily-log2",
+                            question   = "Which plot is the most different?",
+                            reasons    = "Clustering,Different range,Different shape,Different slope,Outlier(s),Other",
+                            lpp        = 13,
+                            trials_req = 0
+                            )
+dbRemoveTable(db_con, "experiment_details")
+dbWriteTable(db_con, "experiment_details", experiment_details)
+experiment_details <- dbReadTable(db_con,"experiment_details")
 experiment_details
 
 # Feedback ---------------------------------------------------------------------
 
 feedback <- dbReadTable(db_con,"feedback")
-# feedback <- tibble(nick_name  = "test",
-#                           ip_address = "test",
-#                           study_starttime = NA,
-#                           prolific_id     = "test",
-#                           start_time = NA,
-#                           end_time   = NA,
-#                           pic_id     = NA,
-#                           response_no = "",
-#                           conf_level  = "test",
-#                           choice_reason = "test"
-#                           )
+# feedback <- tibble(ip_address      = "test",
+#                    nick_name       = "test",
+#                    study_starttime = NA,
+#                    prolific_id     = "test",
+#                    order           = NA,
+#                    start_time      = NA,
+#                    end_time        = NA,
+#                    pic_id          = NA,
+#                    param_value     = "test",
+#                    set             = NA,
+#                    test_param      = "test",
+#                    correct         = NA,
+#                    response_no     = NA,
+#                    conf_level      = "test",
+#                    choice_reason   = "test"
+#                   )
 # feedback <- feedback[0,]
 # dbRemoveTable(db_con, "feedback")
 # dbWriteTable(db_con, "feedback", feedback)
@@ -79,5 +84,4 @@ picture_details
 
 # Disconnect from database -----------------------------------------------------
 
-dbDisconnect(db_con)
-
+dbDisconnect(db_con) 

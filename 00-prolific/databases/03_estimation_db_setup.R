@@ -170,7 +170,7 @@ estimation_questions
 feedback <- dbReadTable(db_con, "feedback")
 # feedback <- tibble(nick_name       = "test",
 #                    ip_address      = "test",
-#                    prolific_id     = "",
+#                    prolific_id     = "test",
 #                    study_starttime = NA,
 #                    start_time      = NA,
 #                    end_time        = NA,
@@ -185,7 +185,7 @@ feedback <- dbReadTable(db_con, "feedback")
 # feedback <- feedback[0,]
 # dbRemoveTable(db_con, "feedback")
 # dbWriteTable(db_con, "feedback", feedback)
-# feedback <- dbReadTable(db_con, "feedback")
+feedback <- dbReadTable(db_con, "feedback")
 feedback
 
 # Feedback Calculation Data -------------------------------------------
@@ -193,7 +193,7 @@ feedback
 calc_feedback <- dbReadTable(db_con, "calc_feedback")
 # calc_feedback <- tibble(nick_name       = "test",
 #                         ip_address      = "test",
-#                         prolific_id     = "",
+#                         prolific_id     = "test",
 #                         study_starttime = NA,
 #                         q_id            = NA,
 #                         creature        = "test",

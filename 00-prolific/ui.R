@@ -212,24 +212,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     ), # end lineup example condition (sidebar)
                     
                     conditionalPanel(condition = "input.lineups_go",
-                                     
-                        h4("Selection"),
-                        textInput("response_no", "Choice", value = "", placeholder = "Click the plot to select"),
-                        # selectizeInput("response_no", "Choice", choices = 1:20, selected = NULL, multiple = T),
-                                     
-                        # Show other text input box if other is selected
-                        checkboxGroupInput("reasoning", "Reasoning", choices = ""),
-                        conditionalPanel(condition = "input.reasoning.indexOf('Other') > -1",
-                                         textInput("other", "Other Reason")
-                        ),
-                                     
-                        selectizeInput("certain", "How certain are you?",
-                                       choices = c("", "Very Uncertain", "Uncertain",
-                                                   "Neutral", "Certain", "Very Certain")),
-                        br(),
-                        uiOutput("lineups_action_buttons"), 
-                        hr(),
-                        h4("Status"),
+                        uiOutput("lineups_action_buttons"),
                         h5(textOutput("lineups_status"))
                         
                     ) # end lineup question flow condition (sidebar)
@@ -266,6 +249,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     conditionalPanel(condition = "input.lineups_go",
                                      
                       h3(textOutput("lineups_question")),
+                      textOutput("lineup_debug"),
                       hr(),
                       uiOutput("lineup", inline = T)
                                      
