@@ -1,15 +1,21 @@
+# you draw it database
+
+# Load Libraries ---------------------------------------------------------------
+
 library(RSQLite)
 library(DBI)
 library(tidyverse)
+library(patchwork)
+library(here)
 
-# Connect to data base ---------------------------------------------
+# Connect to database ----------------------------------------------------------
 
-filename <- "you-draw-it-development/you-draw-it-pilot-app/you_draw_it_data.db"
+filename <- "00-prolific/databases/02_you_draw_it_db.db"
 sqlite.driver <- dbDriver("SQLite")
 db_con <- dbConnect(sqlite.driver, dbname = filename)
 dbListTables(db_con)
 
-# Experiment Details ------------------------------------------------
+# Experiment Details -----------------------------------------------------------
 
 experiment_details <- dbReadTable(db_con,"experiment_details")
 # experiment_details <- experiment_details[0,]
@@ -23,10 +29,10 @@ experiment_details <- dbReadTable(db_con,"experiment_details")
 # experiment_details <- dbReadTable(db_con,"experiment_details")
 experiment_details
 
-# Exponential Scale Study Parameter Details ------------------------
+# Exponential Scale Study Parameter Details ------------------------------------
 
 exp_parameter_details <- dbReadTable(db_con,"exp_parameter_details")
-# exp_parameter_details <- data.frame(beta = c(0.1, 0.23), 
+# exp_parameter_details <- data.frame(beta = c(0.1, 0.23),
 #                                     sd = c(0.09, 0.25)) %>%
 #                           expand_grid(N = 30,
 #                                       x_min = 0,
@@ -36,9 +42,9 @@ exp_parameter_details <- dbReadTable(db_con,"exp_parameter_details")
 # dbRemoveTable(db_con, "exp_parameter_details")
 # dbWriteTable(db_con,  "exp_parameter_details", exp_parameter_details)
 # exp_parameter_details <- dbReadTable(db_con,"exp_parameter_details")
-# exp_parameter_details
+exp_parameter_details
 
-# Eye Fitting Parameter Details -----------------------------------
+# Eye Fitting Parameter Details ------------------------------------------------
 
 eyefitting_parameter_details <- dbReadTable(db_con,"eyefitting_parameter_details")
 # eyefitting_parameter_details <- tibble(parm_id = c("S", "F", "V", "N"),
@@ -53,35 +59,17 @@ eyefitting_parameter_details <- dbReadTable(db_con,"eyefitting_parameter_details
 # eyefitting_parameter_details <- dbReadTable(db_con,"eyefitting_parameter_details")
 eyefitting_parameter_details
 
-# Users Data ---------------------------------------------------
-
-users <- dbReadTable(db_con,"users")
-# users <- tibble(nick_name       = "test",
-#                 study_starttime = NA,
-#                 age             = NA,
-#                 gender          = NA,
-#                 academic_study  = NA,
-#                 recruitment     = NA,
-#                 ip_address      = NA
-#                 )
-# users <- users[0,]
-# dbRemoveTable(db_con, "users")
-# dbWriteTable(db_con, "users", users)
-# users <- dbReadTable(db_con,"users")
-users
-
-
-# Feedback Drawn Data ---------------------------------------------------
+# Feedback Drawn Data ----------------------------------------------------------
 
 feedback <- dbReadTable(db_con,"feedback")
-unique(feedback$parm_id)
 # feedback <- tibble(parm_id    = "test",
 #                    x          = NA,
 #                    y          = NA,
 #                    ydrawn     = NA,
 #                    linear     = NA,
-#                    ip_address = "test",
 #                    nick_name  = "test",
+#                    ip_address = "test",
+#                    prolific_id = "",
 #                    study_starttime = NA,
 #                    start_time = NA,
 #                    end_time   = NA
@@ -91,12 +79,8 @@ unique(feedback$parm_id)
 # dbWriteTable(db_con, "feedback", feedback)
 # feedback <- dbReadTable(db_con, "feedback")
 feedback
-feedback %>%
-  dplyr::filter(study_starttime == max(users$study_starttime)) %>%
-  select(parm_id, linear) %>%
-  unique()
 
-# Simulated Data ---------------------------------------------------
+# Simulated Data ---------------------------------------------------------------
 simulated_data <- dbReadTable(db_con,"simulated_data")
 # simulated_data <- tibble(parm_id    = "test",
 #                          dataset    = NA,
@@ -104,16 +88,15 @@ simulated_data <- dbReadTable(db_con,"simulated_data")
 #                          y          = NA,
 #                          ip_address = "test",
 #                          nick_name  = "test",
-#                          study_starttime = NA
+#                          study_starttime = NA,
+#                          prolific_id = ""
 #                          )
 # simulated_data <- simulated_data[0,]
 # dbRemoveTable(db_con, "simulated_data")
 # dbWriteTable(db_con, "simulated_data", simulated_data)
 # simulated_data <- dbReadTable(db_con, "simulated_data")
 simulated_data
-simulated_data %>%
-  dplyr::filter(study_starttime == max(users$study_starttime)) %>%
-  select(parm_id) %>%
-  unique()
+
+# Disconnect from database -----------------------------------------------------
 
 dbDisconnect(db_con)

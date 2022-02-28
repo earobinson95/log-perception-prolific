@@ -1,17 +1,21 @@
+# estimation database
+
+# Load Libraries ---------------------------------------------------------------
+
 library(RSQLite)
 library(DBI)
 library(tidyverse)
 library(patchwork)
 library(here)
 
-# Connect to data base ---------------------------------------------
+# Connect to database ----------------------------------------------------------
 
-filename <- "estimation-development/estimation-pilot-app/estimation_data.db"
+filename <- "00-prolific/databases/03_estimation_data.db"
 sqlite.driver <- dbDriver("SQLite")
 db_con <- dbConnect(sqlite.driver, dbname = filename)
 dbListTables(db_con)
 
-# Experiment Details ------------------------------------------------
+# Experiment Details -----------------------------------------------------------
 
 experiment_details <- dbReadTable(db_con,"experiment_details")
 # experiment_details <- experiment_details[0,]
@@ -61,39 +65,7 @@ true_parameters <- dbReadTable(db_con, "true_parameters")
 # dbWriteTable(db_con,  "simulated_data", simulated_data)
 # simulated_data <- dbReadTable(db_con, "simulated_data")
 simulated_data
-# write.csv(simulated_data, "estimation-development/estimation-pilot-app/simulated-data.csv", row.names = F, na = "")
-
-# plot simulated data
-base_plot <- simulated_data %>% 
-  ggplot(aes(x = x, y = y)) +
-  geom_point() +
-  geom_line(aes(y = y0), color = "steelblue") +
-  facet_grid(~scenario) +
-  theme_bw() +
-  theme(aspect.ratio = 1)
-
-linear_plot <- base_plot +
-  scale_y_continuous("Population",
-                     labels = comma,
-                     limits = c(100, 55000),
-                     breaks = seq(0, 55000, 5000),
-                     minor_breaks = c())
-
-log_plot <- base_plot + 
-  scale_y_continuous("Population",
-                     trans = "log2",
-                     breaks = 2^seq(0,10000,1),
-                     labels = comma,
-                     minor_breaks = c(2^seq(0,10000,1) + (2^seq(0,10000,1)/2), 2^seq(0,10000,1) + 3*(2^seq(0,10000,1)/4))
-                     # minor_breaks = 2^seq(0,10000,1) + (2^seq(0,10000,1)/2)
-                     # minor_breaks = seq(0, 55000, 5000)
-                     # minor_breaks = c(156, 312)
-                     # minor_breaks = c()
-  )
-
-final_plot <- linear_plot / log_plot
-final_plot
-# ggsave(final_plot, filename = "estimation-development/estimation-pilot-app/simulated-data-plots.png", width = 12, height = 12)
+# write.csv(simulated_data, "00-prolific/data/simulated-data.csv", row.names = F, na = "")
 
 # scanario_text_data -----------------------------------------------------------
 
@@ -157,35 +129,35 @@ estimation_questions <- dbReadTable(db_con, "estimation_questions")
 #                                          "How many times more Ewoks are there in 40 ABY than in 20 ABY?",
 #                                          "How long does it take for the population of Ewoks in 10 ABY to double?"
 #                                         ),
-#                                
+# 
 #                                true_value = c(NA,
-#                                               
+# 
 #                                               NA,
-#                                               
+# 
 #                                               true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta,
-#                                               
+# 
 #                                               log((4000 - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin + 1500,
-#                                               
+# 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta) - (true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
-#                                               
+# 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta)/(true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
-#                                               
+# 
 #                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin,
-#                                               
+# 
 #                                               NA,
-#                                               
+# 
 #                                               NA,
-#                                               
+# 
 #                                               true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta,
-#                                               
+# 
 #                                               log((4000 - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin - 3000,
-#                                               
+# 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta) - (true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
-#                                               
+# 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta)/(true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
-#                                               
+# 
 #                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin
-#                                               
+# 
 #                                )
 #                                )
 # dbRemoveTable(db_con, "estimation_questions")
@@ -193,59 +165,22 @@ estimation_questions <- dbReadTable(db_con, "estimation_questions")
 # estimation_questions <- dbReadTable(db_con,"estimation_questions")
 estimation_questions
 
-# Users Data -------------------------------------------------------------------
-
-users <- dbReadTable(db_con,"users")
-# users <- tibble(nick_name       = "test",
-#                 study_starttime = NA,
-#                 age             = NA,
-#                 gender          = NA,
-#                 academic_study  = NA,
-#                 recruitment     = NA,
-#                 ip_address      = NA
-#                 )
-# users <- users[0,]
-# dbRemoveTable(db_con, "users")
-# dbWriteTable(db_con, "users", users)
-# users <- dbReadTable(db_con,"users")
-users
-
 # Feedback Estimates ---------------------------------------------------
 
 feedback <- dbReadTable(db_con, "feedback")
-# feedback <- tibble(ip_address = "test",
-#                    nick_name  = "test",
+# feedback <- tibble(nick_name       = "test",
+#                    ip_address      = "test",
+#                    prolific_id     = "",
 #                    study_starttime = NA,
-#                    start_time = NA,
-#                    end_time   = NA,
-#                    order      = NA,
-#                    q_id       = NA,
-#                    creature   = "test",
-#                    dataset    = NA,
-#                    scale      = NA,
-#                    response   = "test",
-#                    scratchpad = "test"
-#                    )
-# feedback <- feedback[0,]
-# dbRemoveTable(db_con, "feedback")
-# dbWriteTable(db_con, "feedback", feedback)
-# feedback <- dbReadTable(db_con, "feedback")
-feedback
-
-# Feedback Estimated Data ---------------------------------------------------
-
-feedback <- dbReadTable(db_con, "feedback")
-# feedback <- tibble(ip_address = "test",
-#                    nick_name  = "test",
-#                    study_starttime = NA,
-#                    start_time = NA,
-#                    end_time   = NA,
-#                    order      = NA,
-#                    q_id       = NA,
-#                    creature   = "test",
-#                    dataset    = NA,
-#                    scale      = NA,
-#                    response   = "test"
+#                    start_time      = NA,
+#                    end_time        = NA,
+#                    order           = NA,
+#                    q_id            = NA,
+#                    creature        = "test",
+#                    dataset         = NA,
+#                    scale           = NA,
+#                    response        = "test",
+#                    scratchpad      = "test"
 #                    )
 # feedback <- feedback[0,]
 # dbRemoveTable(db_con, "feedback")
@@ -256,15 +191,16 @@ feedback
 # Feedback Calculation Data -------------------------------------------
 
 calc_feedback <- dbReadTable(db_con, "calc_feedback")
-# calc_feedback <- tibble(ip_address = "test",
-#                         nick_name  = "test",
+# calc_feedback <- tibble(nick_name       = "test",
+#                         ip_address      = "test",
+#                         prolific_id     = "",
 #                         study_starttime = NA,
-#                         q_id       = NA,
-#                         creature   = "test",
-#                         dataset    = NA,
-#                         scale      = NA,
-#                         expression = "test",
-#                         evaluated  = NA
+#                         q_id            = NA,
+#                         creature        = "test",
+#                         dataset         = NA,
+#                         scale           = NA,
+#                         expression      = "test",
+#                         evaluated       = NA
 #                    )
 # calc_feedback <- calc_feedback[0,]
 # dbRemoveTable(db_con, "calc_feedback")
@@ -272,6 +208,6 @@ calc_feedback <- dbReadTable(db_con, "calc_feedback")
 # calc_feedback <- dbReadTable(db_con, "calc_feedback")
 calc_feedback
 
-# Disconnect to data base ---------------------------------------------
+# Disconnect from database -----------------------------------------------------
 
 dbDisconnect(db_con)

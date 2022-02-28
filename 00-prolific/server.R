@@ -167,7 +167,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  # shinyjs::disable(selector = '.navbar-nav a')
+  shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -217,20 +217,21 @@ shinyServer(function(input, output, session) {
          (!is.null(input$recruitment) & input$recruitment != "") && 
          (!is.null(input$prolificID) & input$prolificID != "")) {
       # connect to data base
-      con <- dbConnect(SQLite(), dbname = "databases/00_demographics.db")
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics_db.db")
       
       age <- ifelse(is.null(input$age), "", input$age)
       gender <- ifelse(is.null(input$gender), "", input$gender)
       academic_study <- ifelse(is.null(input$education), "", input$education)
       
       demoinfo <- data.frame(nick_name = input$nickname,
+                             ip_address = input$ipid,
                              study_starttime = study_starttime,
                              prolific_id = as.character(input$prolificID),
                              age = age,
                              gender = gender,
                              academic_study = academic_study,
-                             recruitment = input$recruitment,
-                             ip_address = input$ipid)
+                             recruitment = input$recruitment
+                             )
       
       dbWriteTable(con, "users", demoinfo, append = TRUE, row.names = FALSE)
       dbDisconnect(con)
@@ -385,17 +386,21 @@ shinyServer(function(input, output, session) {
           # This applies to the lineups, not to the trials
           lineup_values$result <- "Submitted!"
           
-          test <- data.frame(ip_address = input$ipid, nick_name = input$nickname,
-                             start_time = lineup_values$starttime, end_time = now(),
-                             pic_id = lineup_values$pic_id,
-                             response_no = lineup_values$choice,
-                             conf_level = input$certain,
-                             choice_reason = reason,
-                             description = lineup_values$experiment)
+          lineup_feedback <- data.frame(ip_address      = input$ipid, 
+                                        nick_name       = input$nickname,
+                                        study_starttime = study_starttime,
+                                        prolific_id     = input$prolificID %>% as.character(),
+                                        start_time      = lineup_values$starttime, 
+                                        end_time        = now(),
+                                        pic_id          = lineup_values$pic_id,
+                                        response_no     = lineup_values$choice,
+                                        conf_level      = input$certain,
+                                        choice_reason   = reason
+                                        )
           
           # Write results to database
           con <- dbConnect(SQLite(), dbname = "databases/01_lineups_db.db")
-          dbWriteTable(con, "feedback", test, append = TRUE, row.names = FALSE)
+          dbWriteTable(con, "feedback", lineup_feedback, append = TRUE, row.names = FALSE)
           dbDisconnect(con)
           
           # Update variables for next trial
@@ -564,6 +569,23 @@ shinyServer(function(input, output, session) {
     # Start you draw it study
     observeEvent(input$begin_you_draw_it, {
       updateCheckboxInput(session, "you_draw_it_go", value = TRUE)
+      
+      con <- dbConnect(sqlite.driver, dbname = "databases/02_you_draw_it_db.db")
+      
+        simulated_data_db <- simulated_data %>%
+          unnest(data) %>%
+          dplyr::select(parm_id, dataset, x, y) %>%
+          mutate(ip_address = input$ipid,
+                 nick_name = input$nickname,
+                 study_starttime = study_starttime,
+                 prolific_id = input$prolificID %>% as.character(),
+                 parm_id = as.character(parm_id)
+          )
+        
+        dbWriteTable(con, "simulated_data", simulated_data_db, append = TRUE, row.names = FALSE)
+      
+      dbDisconnect(con)
+      
     })
     
     # ---- You Draw It Question Flow -------------------------------------------
@@ -629,12 +651,13 @@ shinyServer(function(input, output, session) {
           you_draw_it_values$result <- "Submitted!"
           
           test <- drawn_data() %>%
-            mutate(ip_address = input$ipid,
-                   nick_name = input$nickname,
+            mutate(nick_name       = input$nickname,
+                   ip_address      = input$ipid,
+                   prolific_id     = input$prolificID %>% as.character(),
                    study_starttime = study_starttime,
-                   start_time = you_draw_it_values$starttime,
-                   end_time = now(),
-                   parm_id = as.character(parm_id)
+                   start_time      = you_draw_it_values$starttime,
+                   end_time        = now(),
+                   parm_id         = as.character(parm_id)
             )
           
           # Write results to database
@@ -917,8 +940,9 @@ shinyServer(function(input, output, session) {
         
         estimation_values$result <- "Submitted!"
         
-        response_data <-    tibble(ip_address      = input$ipid,
-                                   nick_name       = input$nickname,
+        response_data <-    tibble(nick_name       = input$nickname,
+                                   ip_address      = input$ipid,
+                                   prolific_id     = input$prolificID %>% as.character(),
                                    study_starttime = study_starttime,
                                    start_time      = estimation_values$starttime,
                                    end_time        = now(),
@@ -976,8 +1000,9 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$calcEval, {
-      calc_data <-    tibble(ip_address      = input$ipid,
-                             nick_name       = input$nickname,
+      calc_data <-    tibble(nick_name       = input$nickname,
+                             ip_address      = input$ipid,
+                             prolific_id     = input$prolificID %>% as.character(),
                              study_starttime = study_starttime,
                              q_id            = estimation_values$q_id,
                              creature        = estimation_values$creature_name,
