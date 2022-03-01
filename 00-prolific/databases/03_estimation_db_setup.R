@@ -65,7 +65,7 @@ true_parameters <- dbReadTable(db_con, "true_parameters")
 # dbWriteTable(db_con,  "simulated_data", simulated_data)
 # simulated_data <- dbReadTable(db_con, "simulated_data")
 simulated_data
-# write.csv(simulated_data, "00-prolific/data/simulated-data.csv", row.names = F, na = "")
+# write.csv(simulated_data, "00-prolific/data/estimation-simulated-data.csv", row.names = F, na = "")
 
 # scanario_text_data -----------------------------------------------------------
 
