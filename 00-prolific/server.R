@@ -167,7 +167,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
