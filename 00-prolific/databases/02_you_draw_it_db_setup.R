@@ -80,6 +80,13 @@ feedback <- dbReadTable(db_con,"feedback")
 # feedback <- dbReadTable(db_con, "feedback")
 feedback
 
+with(feedback, table(prolific_id, parm_id))
+
+feedback %>%
+  filter(x == 10) %>%
+  group_by(prolific_id, parm_id) %>%
+  unique()
+
 # Simulated Data ---------------------------------------------------------------
 simulated_data <- dbReadTable(db_con,"simulated_data")
 # simulated_data <- tibble(parm_id    = "test",
@@ -96,6 +103,11 @@ simulated_data <- dbReadTable(db_con,"simulated_data")
 # dbWriteTable(db_con, "simulated_data", simulated_data)
 # simulated_data <- dbReadTable(db_con, "simulated_data")
 simulated_data
+
+simulated_data %>%
+  filter(x == 10) %>%
+  group_by(prolific_id, parm_id) %>%
+  unique()
 
 # Disconnect from database -----------------------------------------------------
 

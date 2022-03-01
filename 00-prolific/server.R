@@ -580,7 +580,15 @@ shinyServer(function(input, output, session) {
     output$you_draw_it_action_buttons <- renderUI({
       
       if (you_draw_it_values$ydippleft > 0) {
-        actionButton("you_draw_it_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info")
+        tagList(
+          actionButton("reset", "Reset"),
+          br(),
+          br(),
+          actionButton("you_draw_it_submit", "Submit", icon = icon("caret-right"), class = "btn btn-info"),
+          hr(),
+          h4("Status"),
+          h5(textOutput("you_draw_it_status"))
+        )
       } else {
         actionButton("you_draw_it_study_complete", "Continue", icon = icon("caret-right"), class = "btn btn-info")
       }
@@ -921,9 +929,6 @@ shinyServer(function(input, output, session) {
           (!is.null(input$question_text) && input$question_text != "" && !is.na(input$question_text)) &&
           estimation_values$q_id != "scenario" &&
           !any(input$dimension < window_dim_min)) {
-        
-        # Things to do when estimate is given and submitted
-        # disable("submit")
         
         estimation_values$result <- "Submitted!"
         

@@ -10,7 +10,7 @@ library(here)
 
 # Connect to database ----------------------------------------------------------
 
-filename <- "00-prolific/databases/03_estimation_data.db"
+filename <- "00-prolific/databases/03_estimation_db.db"
 sqlite.driver <- dbDriver("SQLite")
 db_con <- dbConnect(sqlite.driver, dbname = filename)
 dbListTables(db_con)
@@ -185,7 +185,7 @@ feedback <- dbReadTable(db_con, "feedback")
 # feedback <- feedback[0,]
 # dbRemoveTable(db_con, "feedback")
 # dbWriteTable(db_con, "feedback", feedback)
-feedback <- dbReadTable(db_con, "feedback")
+# feedback <- dbReadTable(db_con, "feedback")
 feedback
 
 # Feedback Calculation Data -------------------------------------------

@@ -294,12 +294,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                                      
                         # checkboxInput("show_finished", "Show Finished?", value = T),
                         br(),
-                        actionButton("reset", "Reset"),
-                        hr(),
-                        uiOutput("you_draw_it_action_buttons"),
-                        hr(),
-                        h4("Status"),
-                        h5(textOutput("you_draw_it_status"))        
+                        uiOutput("you_draw_it_action_buttons")  
                                      
                                      
                     ) # end you draw it question flow condition (sidebar)

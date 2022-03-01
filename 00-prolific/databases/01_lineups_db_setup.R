@@ -18,15 +18,15 @@ dbListTables(db_con)
 # Experiment Details -----------------------------------------------------------
 
 experiment_details <- dbReadTable(db_con,"experiment_details")
-experiment_details <- tibble(experiment = "emily-log2",
-                            question   = "Which plot is the most different?",
-                            reasons    = "Clustering,Different range,Different shape,Different slope,Outlier(s),Other",
-                            lpp        = 13,
-                            trials_req = 0
-                            )
-dbRemoveTable(db_con, "experiment_details")
-dbWriteTable(db_con, "experiment_details", experiment_details)
-experiment_details <- dbReadTable(db_con,"experiment_details")
+# experiment_details <- tibble(experiment = "emily-log2",
+#                             question   = "Which plot is the most different?",
+#                             reasons    = "Clustering,Different range,Different shape,Different slope,Outlier(s),Other",
+#                             lpp        = 13,
+#                             trials_req = 0
+#                             )
+# dbRemoveTable(db_con, "experiment_details")
+# dbWriteTable(db_con, "experiment_details", experiment_details)
+# experiment_details <- dbReadTable(db_con,"experiment_details")
 experiment_details
 
 # Feedback ---------------------------------------------------------------------
