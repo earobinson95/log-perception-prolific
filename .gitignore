@@ -29,3 +29,4 @@ vignettes/*.pdf
 log-perception-prolific.Rproj
 00-prolific.dcf
 perception-of-statistical-graphics.dcf
+*.dcf
