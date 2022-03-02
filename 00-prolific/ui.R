@@ -432,7 +432,8 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
            
            h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
            br(),
-           h4("52BD9173")
+           # h4("52BD9173")
+           h4("######")
   ) # end done tab
   
   # ----------------------------------------------------------------------------

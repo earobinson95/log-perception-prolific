@@ -22,7 +22,6 @@ library(gridSVG)
 
 # Data Importing and Exporting
 library(readr)
-library(here)
 library(RSQLite)
 library(DBI)
 sqlite.driver <- dbDriver("SQLite")
@@ -35,7 +34,6 @@ window_dim_min <- 600
 
 # add resource paths so Shiny can see them
 addResourcePath("plots", "plots")
-addResourcePath("trials", "trials")
 addResourcePath("examples", "examples")
 
 # ------------------------------------------------------------------------------
@@ -191,7 +189,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -498,9 +496,9 @@ shinyServer(function(input, output, session) {
           # Update reactive values
           lineup_values$pic_id       <- this_picture$pic_id
           lineup_values$order        <- this_picture$order
-          lineup_values$param_value <- this_picture$param_value
-          lineup_values$set         <- this_picture$set
-          lineup_values$scale       <- this_picture$test_param
+          lineup_values$param_value  <- this_picture$param_value
+          lineup_values$set          <- this_picture$set
+          lineup_values$scale        <- this_picture$test_param
           lineup_values$correct      <- this_picture$obs_plot_location
           
           # Reset UI selections
