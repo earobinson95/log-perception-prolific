@@ -189,7 +189,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -1181,10 +1181,10 @@ shinyServer(function(input, output, session) {
     })
     
     output$simple_calculator <- renderUI({
-      input$submit
+      input$estimation_submit
       
-      if (values$q_id != "scenario" && values$qcounter <= values$qreq) {
-        if(values$q_id != "scenario" && values$q_id != "Q0") {
+      if (estimation_values$q_id != "scenario" && estimation_values$qcounter <= estimation_values$qreq) {
+        if(estimation_values$q_id != "scenario" && estimation_values$q_id != "Q0") {
           
           tagList(
             
@@ -1209,11 +1209,11 @@ shinyServer(function(input, output, session) {
     calculationVals <- eventReactive(input$calcEval, {
       
       shiny::validate(
-        need(try(calc_expression <- validinp_calculator(input$calc)), "Please provide a valid calculator expression (+ - / *)")
+        need(try(calc_expression <- validinp_calculator(input$calc)), "Please provide a valid calculator expression. Valid inputs: + - / * log() log2() log10()")
       )
       
       shiny::validate(
-        need(try(calc_evaluation <- eval(parse(text = input$calc))), "Please provide a valid calculator expression (+ - / *)")
+        need(try(calc_evaluation <- eval(parse(text = input$calc))), "Please provide a valid calculator expression. Valid inputs: + - / * log() log2() log10()")
       )
       
       if(!is.null(input$calc) && input$calc != "" && is.numeric(calc_evaluation)) {
