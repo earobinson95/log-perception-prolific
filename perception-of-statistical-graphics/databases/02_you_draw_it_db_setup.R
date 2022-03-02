@@ -10,7 +10,7 @@ library(here)
 
 # Connect to database ----------------------------------------------------------
 
-filename <- "00-prolific/databases/02_you_draw_it_db.db"
+filename <- "perception-of-statistical-graphics/databases/02_you_draw_it_db.db"
 sqlite.driver <- dbDriver("SQLite")
 db_con <- dbConnect(sqlite.driver, dbname = filename)
 dbListTables(db_con)
