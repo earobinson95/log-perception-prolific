@@ -87,6 +87,12 @@ feedback %>%
   group_by(prolific_id, parm_id) %>%
   unique()
 
+feedback %>%
+  filter(x == 10) %>%
+  group_by(prolific_id, parm_id) %>%
+  unique() %>%
+  arrange(parm_id)
+
 # Simulated Data ---------------------------------------------------------------
 simulated_data <- dbReadTable(db_con,"simulated_data")
 # simulated_data <- tibble(parm_id    = "test",

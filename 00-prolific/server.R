@@ -151,6 +151,30 @@ dbDisconnect(con)
 # SETUP STUDY 3: ESTIMATION ----------------------------------------------------
 # ------------------------------------------------------------------------------
 
+options(shiny.sanitize.errors = TRUE)
+
+#' validate calculator input
+#' 
+#' validate calculator: textInput
+#' 
+#' @param x input
+#' @param pattern that input has to match (regexp)
+#' @param many TRUE if more than 1 string (checkboxGroupInput)
+#' @return validated input
+#' @export
+#' @examples
+#' \dontrun{validinp_character(input$txt)}
+#' \dontrun{validinp_character(input$radiobox, pattern="^((ab)|(cd))$")}
+#' \dontrun{validinp_character(input$chkboxgrp, many=TRUE}
+validinp_calculator <- function(x, pattern="^[[:alnum:]. _+-/*]*$", many=FALSE) {
+  if(many && is.null(x)) return(character(0))  ## hack for checkboxGroupInput
+  if(!( is.character(x) && (many || length(x)==1) && 
+        all(!is.na(x)) && all(grepl(pattern,x)) )) {
+    stop("Invalid input from shiny UI")
+  }
+  x
+}
+
 # connect to database
 con <- dbConnect(sqlite.driver, dbname = "databases/03_estimation_db.db")
 
@@ -167,7 +191,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  # shinyjs::disable(selector = '.navbar-nav a')
+  shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -1178,10 +1202,16 @@ shinyServer(function(input, output, session) {
     
     calculationVals <- eventReactive(input$calcEval, {
       
-      if(!is.null(input$calc) && input$calc != "" & is.numeric(eval(parse(text=input$calc)))) {
-        eval(parse(text=input$calc)) %>% as.character()
-      } else {
-        "Please enter in a valid expression."
+      shiny::validate(
+        need(try(calc_expression <- validinp_calculator(input$calc)), "Please provide a valid calculator expression (+ - / *)")
+      )
+      
+      shiny::validate(
+        need(try(calc_evaluation <- eval(parse(text = input$calc))), "Please provide a valid calculator expression (+ - / *)")
+      )
+      
+      if(!is.null(input$calc) && input$calc != "" && is.numeric(calc_evaluation)) {
+        eval(parse(text = input$calc)) %>% as.character() 
       }
       
     })

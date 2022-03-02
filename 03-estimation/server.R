@@ -22,6 +22,31 @@ library(RSQLite)
 library(DBI)
 sqlite.driver <- dbDriver("SQLite")
 
+options(shiny.sanitize.errors = TRUE)
+
+#' validate calculator input
+#' 
+#' validate calculator: textInput
+#' 
+#' @param x input
+#' @param pattern that input has to match (regexp)
+#' @param many TRUE if more than 1 string (checkboxGroupInput)
+#' @return validated input
+#' @export
+#' @examples
+#' \dontrun{validinp_character(input$txt)}
+#' \dontrun{validinp_character(input$radiobox, pattern="^((ab)|(cd))$")}
+#' \dontrun{validinp_character(input$chkboxgrp, many=TRUE}
+validinp_calculator <- function(x, pattern="^[[:alnum:]. _+-/*]*$", many=FALSE) {
+  if(many && is.null(x)) return(character(0))  ## hack for checkboxGroupInput
+  if(!( is.character(x) && (many || length(x)==1) && 
+        all(!is.na(x)) && all(grepl(pattern,x)) )) {
+    stop("Invalid input from shiny UI")
+  }
+  x
+}
+
+
 # ----------------------------------------------------------------------------------------------------
 # Set up Experiment -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
@@ -268,8 +293,8 @@ shinyServer(function(input, output, session) {
                              dataset         = values$dataset_id,
                              scale           = values$scale,
                              expression      = input$calc,
-                             evaluated       = calculationVals())
-      
+                             evaluated       = calculationVals()  %>% as.character())
+
       # Write results to database
       con <- dbConnect(sqlite.driver, dbname = "estimation_data.db")
       dbWriteTable(con, "calc_feedback", calc_data, append = TRUE, row.names = FALSE)
@@ -441,10 +466,16 @@ shinyServer(function(input, output, session) {
     
     calculationVals <- eventReactive(input$calcEval, {
       
-      if(!is.null(input$calc) && input$calc != "" & is.numeric(eval(parse(text=input$calc)))) {
-        eval(parse(text=input$calc)) %>% as.character()
-      } else {
-        "Please enter in a valid expression."
+      shiny::validate(
+        need(try(calc_expression <- validinp_calculator(input$calc)), "Please provide a valid calculator expression (+ - / *)")
+      )
+      
+      shiny::validate(
+        need(try(calc_evaluation <- eval(parse(text = input$calc))), "Please provide a valid calculator expression (+ - / *)")
+      )
+      
+      if(!is.null(input$calc) && input$calc != "" && is.numeric(calc_evaluation)) {
+        eval(parse(text = input$calc)) %>% as.character() 
       }
       
     })
