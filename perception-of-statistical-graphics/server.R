@@ -258,6 +258,9 @@ shinyServer(function(input, output, session) {
       dbWriteTable(con, "users", demoinfo, append = TRUE, row.names = FALSE)
       dbDisconnect(con)
       
+      # mark demographics complete
+      updateCheckboxInput(session, "demographics_done", value = TRUE)
+      
       # move to study 1
       updateTabsetPanel(session, "inNavBar", selected = "study1-lineups-tab")
       
@@ -266,7 +269,6 @@ shinyServer(function(input, output, session) {
       }
     }
   })
-
 
 # ------------------------------------------------------------------------------
 # STUDY 1: LINEUP --------------------------------------------------------------
@@ -533,8 +535,11 @@ shinyServer(function(input, output, session) {
     }) # end renderUI
     
     
-    # Move to You Draw It Study 
     observeEvent(input$lineups_complete, {
+      # mark lineups as done
+      updateCheckboxInput(session, "lineups_done", value = TRUE)
+      
+      # Move to You Draw It Study 
       updateTabsetPanel(session, "inNavBar", selected = "study2-you-draw-it-tab")
     })
     
@@ -857,8 +862,10 @@ shinyServer(function(input, output, session) {
       
     })
     
-    # move to estimation study
     observeEvent(input$you_draw_it_study_complete, {
+      # mark you draw it as done
+      updateCheckboxInput(session, "you_draw_it_done", value = TRUE)
+      # move to estimation study
       updateTabsetPanel(session, "inNavBar",selected = "study3-estimation-tab")
     })
     
@@ -1255,14 +1262,59 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$estimation_study_complete, {
+        
+        # mark estimation study as done
+        updateCheckboxInput(session, "estimation_done", value = TRUE)
       
         # move to done page
         updateTabsetPanel(session, "inNavBar",selected = "done-tab")
       
     })
     
+    
 # ------------------------------------------------------------------------------
+# Done Page --------------------------------------------------------------------
 # ------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------
+    
+    output$done_UI <- renderUI({
+      
+      if(input$demographics_done && input$lineups_done && input$you_draw_it_done && input$estimation_done){
+        tagList(
+          h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
+          br(),
+          # h4("52BD9173")
+          h4("######")
+        ) 
+      }
+      
+      if(!input$demographics_done){
+        tagList(
+          h5("Please return to complete your demographics."),
+          actionButton("return_to_demographics", "Return to Demographics", class = "btn btn-info")
+        ) 
+      }
+      
+      if(!input$lineups_done){
+        tagList(
+          h5("Please return to complete your Study 1: Lineups."),
+          actionButton("return_to_lineup_study", "Return to Study 3", class = "btn btn-info")
+        )
+      }
+      
+      if(!input$you_draw_it_done){
+        tagList(
+          h5("Please return to complete your Study 2: You Draw It."),
+          actionButton("return_to_you_draw_it_study", "Return to Study 2", class = "btn btn-info")
+        )
+      }
+      
+      if(!input$estimation_done){
+        tagList(
+          h5("Please return to complete your Study 3: Estimation."),
+          actionButton("return_to_estimation_study", "Return to Study 3", class = "btn btn-info")
+        )
+      }
+      
+    })
 
 }) # end server
