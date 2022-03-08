@@ -1285,7 +1285,7 @@ shinyServer(function(input, output, session) {
           # h4("52BD9173")
           h4("######")
         )
-      } else if(!input$demographics_done){
+      } else if(!input$consent){
         tagList(
           h5("Please return to provide informed consent."),
           actionButton("return_to_informed_consent", "Return to Informed Consent", class = "btn btn-info")
@@ -1298,7 +1298,7 @@ shinyServer(function(input, output, session) {
       } else if (!input$lineups_done){
         tagList(
           h5("Please return to complete your Study 1: Lineups."),
-          actionButton("return_to_lineup_study", "Return to Study 3", class = "btn btn-info")
+          actionButton("return_to_lineup_study", "Return to Study 1", class = "btn btn-info")
         )
       } else if (!input$you_draw_it_done){
         tagList(
@@ -1315,7 +1315,7 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$return_to_informed_consent, {
-      updateTabsetPanel(session, "inNavBar",selected = "informed-consent-tab-tab")
+      updateTabsetPanel(session, "inNavBar",selected = "informed-consent-tab")
     })
     
     observeEvent(input$return_to_demographics, {
