@@ -96,12 +96,10 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                     
                 actionButton("beginexp", "Begin Experiment", class = "btn btn-info"),
              
-             hidden(
-               checkboxInput("demographics_done", "Demographics Complete", value = FALSE),
-               checkboxInput("lineups_done", "Lineup Study Complete", value = FALSE),
-               checkboxInput("you_draw_it_done", "You Draw It Study Complete", value = FALSE),
-               checkboxInput("estimation_done", "Estimation Study Complete", value = FALSE),
-             ),
+             hidden(checkboxInput("demographics_done", "Demographics Complete", value = FALSE)),
+             hidden(checkboxInput("lineups_done", "Lineup Study Complete", value = FALSE)),
+             hidden(checkboxInput("you_draw_it_done", "You Draw It Study Complete", value = FALSE)),
+             hidden(checkboxInput("estimation_done", "Estimation Study Complete", value = FALSE))
              
                     
       ), # end informed consent sidebar panel column
@@ -457,11 +455,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
   
   tabPanel("Done",
            value = "done-tab",
-           
-           h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
-           br(),
-           # h4("52BD9173")
-           h4("######")
+           uiOutput("done_UI")
   ) # end done tab
   
   # ----------------------------------------------------------------------------

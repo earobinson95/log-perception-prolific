@@ -189,7 +189,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
 # ------------------------------------------------------------------------------
@@ -1285,30 +1285,22 @@ shinyServer(function(input, output, session) {
           # h4("52BD9173")
           h4("######")
         )
-      }
-      
-      if(!input$demographics_done){
+      } else if(!input$demographics_done){
         tagList(
           h5("Please return to complete your demographics."),
           actionButton("return_to_demographics", "Return to Demographics", class = "btn btn-info")
-        ) 
-      }
-      
-      if(!input$lineups_done){
+        )
+      } else if (!input$lineups_done){
         tagList(
           h5("Please return to complete your Study 1: Lineups."),
           actionButton("return_to_lineup_study", "Return to Study 3", class = "btn btn-info")
         )
-      }
-      
-      if(!input$you_draw_it_done){
+      } else if (!input$you_draw_it_done){
         tagList(
           h5("Please return to complete your Study 2: You Draw It."),
           actionButton("return_to_you_draw_it_study", "Return to Study 2", class = "btn btn-info")
         )
-      }
-      
-      if(!input$estimation_done){
+      } else if (!input$estimation_done){
         tagList(
           h5("Please return to complete your Study 3: Estimation."),
           actionButton("return_to_estimation_study", "Return to Study 3", class = "btn btn-info")
