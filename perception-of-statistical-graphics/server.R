@@ -1287,6 +1287,11 @@ shinyServer(function(input, output, session) {
         )
       } else if(!input$demographics_done){
         tagList(
+          h5("Please return to provide informed consent."),
+          actionButton("return_to_informed_consent", "Return to Informed Consent", class = "btn btn-info")
+        )
+      } else if(!input$demographics_done){
+        tagList(
           h5("Please return to complete your demographics."),
           actionButton("return_to_demographics", "Return to Demographics", class = "btn btn-info")
         )
@@ -1307,6 +1312,10 @@ shinyServer(function(input, output, session) {
         )
       }
       
+    })
+    
+    observeEvent(input$return_to_informed_consent, {
+      updateTabsetPanel(session, "inNavBar",selected = "informed-consent-tab-tab")
     })
     
     observeEvent(input$return_to_demographics, {
