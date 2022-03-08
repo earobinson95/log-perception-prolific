@@ -1284,7 +1284,7 @@ shinyServer(function(input, output, session) {
           br(),
           # h4("52BD9173")
           h4("######")
-        ) 
+        )
       }
       
       if(!input$demographics_done){
@@ -1315,6 +1315,22 @@ shinyServer(function(input, output, session) {
         )
       }
       
+    })
+    
+    observeEvent(input$return_to_demographics, {
+        updateTabsetPanel(session, "inNavBar",selected = "demographics-tab")
+    })
+    
+    observeEvent(input$return_to_lineup_study, {
+      updateTabsetPanel(session, "inNavBar",selected = "study1-lineups-tab")
+    })
+    
+    observeEvent(input$return_to_you_draw_it_study, {
+      updateTabsetPanel(session, "inNavBar",selected = "study2-you-draw-it-tab")
+    })
+    
+    observeEvent(input$return_to_estimation_study, {
+      updateTabsetPanel(session, "inNavBar",selected = "study3-estimation-tab")
     })
 
 }) # end server
