@@ -1287,27 +1287,27 @@ shinyServer(function(input, output, session) {
         )
       } else if(!input$consent){
         tagList(
-          h5("Please return to provide informed consent."),
+          h5("Please return to provide informed consent and subsequent incomplete parts."),
           actionButton("return_to_informed_consent", "Return to Informed Consent", class = "btn btn-info")
         )
       } else if(!input$demographics_done){
         tagList(
-          h5("Please return to complete your demographics."),
+          h5("Please return to complete your demographics and subsequent incomplete parts."),
           actionButton("return_to_demographics", "Return to Demographics", class = "btn btn-info")
         )
       } else if (!input$lineups_done){
         tagList(
-          h5("Please return to complete your Study 1: Lineups."),
+          h5("Please return to complete Study 1: Lineups."),
           actionButton("return_to_lineup_study", "Return to Study 1", class = "btn btn-info")
         )
       } else if (!input$you_draw_it_done){
         tagList(
-          h5("Please return to complete your Study 2: You Draw It."),
+          h5("Please return to complete Study 2: You Draw It and subsequent incomplete parts."),
           actionButton("return_to_you_draw_it_study", "Return to Study 2", class = "btn btn-info")
         )
       } else if (!input$estimation_done){
         tagList(
-          h5("Please return to complete your Study 3: Estimation."),
+          h5("Please return to complete Study 3: Estimation and subsequent incomplete parts."),
           actionButton("return_to_estimation_study", "Return to Study 3", class = "btn btn-info")
         )
       }

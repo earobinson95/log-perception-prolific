@@ -113,7 +113,8 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
             HTML("<b> Study 1 </b> examines the ability to differentiate curves shown on charts and graphs (13 questions, about 15 minutes to complete)."),
             img(src = "lineup-example1.png", width="50%", align = "center"),
             br(),
-            HTML("<b> Study 2 </b> examines the ability to predict data by using your mouse to draw a trend line (12 questions, about 15 minutes to complete)."),
+            br(),
+            HTML("<b> Study 2 </b> examines the ability to predict data by using your mouse to draw a trend line (12 questions, about 15 minutes to complete). <br> <b> You may want a computer mouse handy for this study! </b>"),
             fluidRow(
             column(width = 2,
               img(src="exponential-orig.gif", align = "center", width = 175)
