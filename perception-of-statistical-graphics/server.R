@@ -189,7 +189,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  shinyjs::disable(selector = '.navbar-nav a')
+  # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
   output$clock <- renderText({
@@ -718,7 +718,7 @@ shinyServer(function(input, output, session) {
         you_draw_it_values$submitted <- TRUE
       } else {
         # Don't let them move ahead without doing the trial
-        showNotification("Please finish drawing the trend for the entire yellow box region.")
+        showNotification("Please finish drawing the trend for the entire yellow box region. You may need to go slower, and make sure to catch the left edge of the graph.")
       }
     })
     
@@ -1285,10 +1285,10 @@ shinyServer(function(input, output, session) {
       
       if(input$demographics_done && input$lineups_done && input$you_draw_it_done && input$estimation_done){
         tagList(
-          h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
+          h5("Thank you for participating in our studies. If you are from prolific, copy paste the Prolific completion code:"),
           br(),
-          # h4("52BD9173")
-          h4("######")
+          h4("52BD9173")
+          # h4("######")
         )
       } else if(!input$consent){
         tagList(

@@ -111,7 +111,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
       column(id = "informed_consent_main", width = 9,
              
             h3("Welcome to a Survey on Graphical Inference"),
-            HTML("This web site is designed to conduct a series of three surveys on graphical inference which will help us understand human perception of graphics for use in communicating statistics. In this study, you will be guided through each of the three studies:"),
+            HTML("This web site is designed to conduct a series of three surveys on graphical inference which will help us understand human perception of graphics for use in communicating statistics. In this experiment, you will be guided through each of the three studies:"),
             br(),
             br(),
             HTML("<b> Study 1 </b> examines the ability to differentiate curves shown on charts and graphs (13 questions, about 15 minutes to complete)."),
