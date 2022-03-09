@@ -129,6 +129,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
             ),
             br(),
             HTML("<b> Study 3 </b> examines graph comprehension of different types of charts and graphs (12 questions, about 15 minutes to complete)."),
+            br(),
             img(src = "example-linear-drawing.png", width="40%", align = "center"),
             br(),
             br(),
