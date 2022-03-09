@@ -24,7 +24,7 @@ if ("databases/00_demographics_db.db" %in% modified |
     "databases/03_estimation_db.db" %in% modified) {
 
   # Add changed db to commit and commit
-  git2r::add(repo = '.', list.files("databases", "*.db$", full.names = T))
+  git2r::add(repo = '..', list.files("databases", "*.db$", full.names = T))
   try(git2r::commit(message = "Update data"))
 
   # Update
