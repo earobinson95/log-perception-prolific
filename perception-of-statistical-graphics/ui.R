@@ -53,6 +53,10 @@ inputBrowserDims <- tags$head(
     });
   '))
 
+tags$div(style = "position: absolute; top: -100px;",
+         textOutput("clock")
+)
+
 # ------------------------------------------------------------------------------
 # BEGIN NAVPAR PAGE ------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -94,20 +98,41 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                       
                 checkboxInput("consent","I have read the informed consent document and agree.", width = "100%"),
                     
-                actionButton("beginexp", "Begin Experiment", class = "btn btn-info")
+                actionButton("beginexp", "Begin Experiment", class = "btn btn-info"),
+             
+             hidden(checkboxInput("demographics_done", "Demographics Complete", value = FALSE)),
+             hidden(checkboxInput("lineups_done", "Lineup Study Complete", value = FALSE)),
+             hidden(checkboxInput("you_draw_it_done", "You Draw It Study Complete", value = FALSE)),
+             hidden(checkboxInput("estimation_done", "Estimation Study Complete", value = FALSE))
+             
                     
       ), # end informed consent sidebar panel column
              
       column(id = "informed_consent_main", width = 9,
-
-            h4("Welcome to a Survey on Graphical Inference"),
-            HTML("This web site is designed to conduct a series of three surveys on graphical inference which will help us understand human perception of graphics for use in communicating statistics. <br><br>
-                 In this study, you will guided through each of the three studies:<br><br>
-                 1. examines the ability to differentiate curves shown on charts and graphs (12 questions; ~ 15 minutes to complete).<br><br>
-                 2. examines the ability to predict data by using your mouse to draw a trend line (12 questions; ~ 15 minutes to complete).<br><br>
-                 3. examines graph comprehension of different types of charts and graphs (12 questions; ~ 15 minutes to complete).<br><br>
-                 Finally we would like to collect some information about you (age category, education, and gender)."
-                 )
+             
+            h3("Welcome to a Survey on Graphical Inference"),
+            HTML("This web site is designed to conduct a series of three surveys on graphical inference which will help us understand human perception of graphics for use in communicating statistics. In this study, you will be guided through each of the three studies:"),
+            br(),
+            br(),
+            HTML("<b> Study 1 </b> examines the ability to differentiate curves shown on charts and graphs (13 questions, about 15 minutes to complete)."),
+            img(src = "lineup-example1.png", width="50%", align = "center"),
+            br(),
+            br(),
+            HTML("<b> Study 2 </b> examines the ability to predict data by using your mouse to draw a trend line (12 questions, about 15 minutes to complete). <br> <b> You may want a computer mouse handy for this study! </b>"),
+            fluidRow(
+            column(width = 2,
+              img(src="exponential-orig.gif", align = "center", width = 175)
+            ),
+            column(width = 2,
+              img(src="linear1-orig.gif", align = "center", width = 175)
+            )
+            ),
+            br(),
+            HTML("<b> Study 3 </b> examines graph comprehension of different types of charts and graphs (12 questions, about 15 minutes to complete)."),
+            img(src = "example-linear-drawing.png", width="40%", align = "center"),
+            br(),
+            br(),
+            HTML("Finally we would like to collect some information about you (age category, education, and gender).")
             
       ) # end informed consent main column
       
@@ -435,11 +460,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
   
   tabPanel("Done",
            value = "done-tab",
-           
-           h5("Thank you for participating in our studies. Copy paste the Prolific completion code:"),
-           br(),
-           # h4("52BD9173")
-           h4("######")
+           uiOutput("done_UI")
   ) # end done tab
   
   # ----------------------------------------------------------------------------
