@@ -192,6 +192,11 @@ shinyServer(function(input, output, session) {
   # shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
+  output$clock <- renderText({
+    invalidateLater(5000)
+    Sys.time()
+  })
+  
 # ------------------------------------------------------------------------------
 # INTRO / WELCOME --------------------------------------------------------------
 # ------------------------------------------------------------------------------
