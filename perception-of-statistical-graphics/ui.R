@@ -184,6 +184,11 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                                         "Graduate Degree",
                                         "Prefer not to answer")),
           
+          radioButtons("use_mouse", "Are you using a computer mouse to complete the study?",
+                       choices = c("Yes", 
+                                   "No"),
+                       selected = NA),
+          
           selectizeInput("recruitment",
                          "How were you recruited for participation in this study?",
                          choices = c("", 

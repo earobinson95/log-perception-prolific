@@ -25,6 +25,7 @@ users <- dbReadTable(db_con,"users")
 #                 age             = NA,
 #                 gender          = NA,
 #                 academic_study  = NA,
+#                 computer_mouse  = NA,
 #                 recruitment     = NA
 #                 )
 # users <- users[0,]

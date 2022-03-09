@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 
 # Shiny specific
+
 library(shiny)
 library(shinyjs)
 library(shinyBS)
@@ -30,7 +31,7 @@ sqlite.driver <- dbDriver("SQLite")
 # OVERALL SET UP ---------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-window_dim_min <- 600
+window_dim_min <- 550
 
 # add resource paths so Shiny can see them
 addResourcePath("plots", "plots")
@@ -189,7 +190,7 @@ dbDisconnect(con)
 
 shinyServer(function(input, output, session) {
   
-  # shinyjs::disable(selector = '.navbar-nav a')
+  shinyjs::disable(selector = '.navbar-nav a')
   study_starttime = now()
   
   output$clock <- renderText({
@@ -256,6 +257,7 @@ shinyServer(function(input, output, session) {
                              prolific_id = as.character(input$prolificID),
                              age = age,
                              gender = gender,
+                             computer_mouse  = as.character(input$use_mouse),
                              academic_study = academic_study,
                              recruitment = input$recruitment
                              )
