@@ -1,0 +1,91 @@
+---
+title: "Perception (Lineups)"
+author: "Emily Robinson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(tidyverse)
+
+library(RSQLite)
+library(DBI)
+library(here)
+library(readr)
+
+library(lme4)
+library(emmeans)
+```
+
+## Data
+
+```{r}
+
+# user data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+users <- dbReadTable(db_con,"users")
+completed_sections <- dbReadTable(db_con,"completed_sections")
+dbDisconnect(db_con)
+
+# lineup data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
+lineups_feedback <- dbReadTable(db_con,"feedback")
+picture_details <- dbReadTable(db_con,"picture_details")
+dbDisconnect(db_con)
+
+# combine lineup feedback, user data
+joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
+lineup_data_orig <- right_join(users, lineups_feedback, by = joinCols)
+
+factorCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "pic_id", "param_value", "set", "test_param", "conf_level")
+lineup_data_orig[,factorCols] <- lapply(lineup_data_orig[,factorCols], factor)
+
+lineup_model_data <- lineup_data_orig %>%
+  # filter(recruitment != "I am the researcher") %>%
+  separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
+  filter(target != null) %>%
+  mutate(curvature = paste(target, null, sep = "-"), .after = null) %>%
+  rename(scale = test_param) %>%
+  group_by(nick_name, ip_address, study_starttime, prolific_id) %>%
+  mutate(n_lineups = n()) %>%
+  ungroup() %>%
+  # filter(n_lineups == 12) %>%
+  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no)
+```
+
+There are `r length(unique(lineup_model_data$prolific_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
+
+```{r}
+lineup_model_data %>%
+  select(prolific_id, age, gender, academic_study, set, curvature, scale, correct, response_no, response, conf_level) %>%
+  head() %>%
+  knitr::kable()
+```
+
+```{r}
+lineup_model_data %>%
+  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  summarize(n = n()) %>%
+  filter(scale == "linear") %>%
+  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+              names_from = "curvature",
+              values_from = "n") %>%
+  arrange(study_starttime) %>%
+  knitr::kable()
+
+lineup_model_data %>%
+  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  summarize(n = n()) %>%
+  filter(scale == "log") %>%
+  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+              names_from = "curvature",
+              values_from = "n") %>%
+  arrange(study_starttime) %>%
+  knitr::kable()
+```
+
