@@ -34,6 +34,22 @@ users <- dbReadTable(db_con,"users")
 # users <- dbReadTable(db_con,"users")
 users
 
+# Completed Sections -----------------------------------------------------------
+
+completed_sections <- dbReadTable(db_con,"completed_sections")
+# completed_sections <- tibble(nick_name        = "test",
+#                              ip_address       = NA,
+#                              study_starttime  = NA,
+#                              prolific_id      = NA,
+#                              time             = NA,
+#                              section_complete = "test"
+#                 )
+# completed_sections <- completed_sections[0,]
+# dbRemoveTable(db_con, "completed_sections")
+# dbWriteTable(db_con, "completed_sections", completed_sections)
+# completed_sections <- dbReadTable(db_con,"completed_sections")
+completed_sections
+
 # Disconnect from database -----------------------------------------------------
 
 dbDisconnect(db_con)

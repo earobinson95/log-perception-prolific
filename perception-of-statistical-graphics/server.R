@@ -222,6 +222,18 @@ shinyServer(function(input, output, session) {
     
     # Only start experiment when consent is provided
     if (input$consent){
+      
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics_db.db")
+      consent_complete <- tibble(nick_name        = input$nickname,
+                                 ip_address       = input$ipid,
+                                 study_starttime  = study_starttime,
+                                 prolific_id      = NA,
+                                 time             = now(),
+                                 section_complete = "informed_consent"
+      )
+      dbWriteTable(con, "completed_sections", consent_complete, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
+      
     # move to demographics
     updateTabsetPanel(session, "inNavBar",selected = "demographics-tab")
     } else {
@@ -263,6 +275,16 @@ shinyServer(function(input, output, session) {
                              )
       
       dbWriteTable(con, "users", demoinfo, append = TRUE, row.names = FALSE)
+      
+      demo_complete <- tibble(nick_name        = input$nickname,
+                              ip_address       = input$ipid,
+                              study_starttime  = study_starttime,
+                              prolific_id      = as.character(input$prolificID),
+                              time             = now(),
+                              section_complete = "demographics"
+                      )
+      dbWriteTable(con, "completed_sections", demo_complete, append = TRUE, row.names = FALSE)
+      
       dbDisconnect(con)
       
       # mark demographics complete
@@ -543,6 +565,18 @@ shinyServer(function(input, output, session) {
     
     
     observeEvent(input$lineups_complete, {
+      
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics_db.db")
+      lineups_complete <- tibble(nick_name        = input$nickname,
+                              ip_address       = input$ipid,
+                              study_starttime  = study_starttime,
+                              prolific_id      = as.character(input$prolificID),
+                              time             = now(),
+                              section_complete = "lineups"
+      )
+      dbWriteTable(con, "completed_sections", lineups_complete, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
+      
       # mark lineups as done
       updateCheckboxInput(session, "lineups_done", value = TRUE)
       
@@ -870,6 +904,18 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$you_draw_it_study_complete, {
+      
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics_db.db")
+      you_draw_it_complete <- tibble(nick_name        = input$nickname,
+                                 ip_address       = input$ipid,
+                                 study_starttime  = study_starttime,
+                                 prolific_id      = as.character(input$prolificID),
+                                 time             = now(),
+                                 section_complete = "you-draw-it"
+      )
+      dbWriteTable(con, "completed_sections", you_draw_it_complete, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
+      
       # mark you draw it as done
       updateCheckboxInput(session, "you_draw_it_done", value = TRUE)
       # move to estimation study
@@ -1269,6 +1315,17 @@ shinyServer(function(input, output, session) {
     })
     
     observeEvent(input$estimation_study_complete, {
+      
+      con <- dbConnect(SQLite(), dbname = "databases/00_demographics_db.db")
+      estimation_complete <- tibble(nick_name        = input$nickname,
+                                    ip_address       = input$ipid,
+                                    study_starttime  = study_starttime,
+                                    prolific_id      = as.character(input$prolificID),
+                                    time             = now(),
+                                    section_complete = "estimation"
+      )
+      dbWriteTable(con, "completed_sections", estimation_complete, append = TRUE, row.names = FALSE)
+      dbDisconnect(con)
         
         # mark estimation study as done
         updateCheckboxInput(session, "estimation_done", value = TRUE)
@@ -1287,7 +1344,7 @@ shinyServer(function(input, output, session) {
       
       if(input$demographics_done && input$lineups_done && input$you_draw_it_done && input$estimation_done){
         tagList(
-          h5("Thank you for participating in our studies. If you are from prolific, copy paste the Prolific completion code:"),
+          h5("Thank you for participating in our experiment. If you are from prolific, copy paste the Prolific completion code:"),
           br(),
           h4("52BD9173")
           # h4("######")
