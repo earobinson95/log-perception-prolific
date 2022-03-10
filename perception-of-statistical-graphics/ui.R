@@ -238,6 +238,9 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
                         helpText("2. Provide reasons for choice"),
                         helpText("3. How certain are you?"),
                         br(),
+                        downloadButton("downloadLineupRandomization", "Download"),
+                        br(),
+                        br(),
                         actionButton("begin_lineups", "Begin Study 1", class = "btn btn-info")
                       
                     ), # end lineup example condition (sidebar)

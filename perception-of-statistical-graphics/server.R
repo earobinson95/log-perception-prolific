@@ -305,6 +305,16 @@ shinyServer(function(input, output, session) {
 
 # LINEUP EXAMPLES --------------------------------------------------------------
   
+  # download lineup randomization data
+  output$downloadLineupRandomization <- downloadHandler(
+    filename = function() {
+      paste(input$prolificID %>% as.character(), "-lineup-randomization.csv.csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(picture_details_order, file, row.names = FALSE)
+    }
+  )
+  
     # Lineup Text and Instructions
     output$lineups_text <- renderUI({
       HTML("The following examples illustrate the types of questions you may encounter during this experiment.")
