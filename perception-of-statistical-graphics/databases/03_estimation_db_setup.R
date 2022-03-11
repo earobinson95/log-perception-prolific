@@ -85,7 +85,7 @@ scenario_text_data <- dbReadTable(db_con, "scenario_text_data")
 # scenario_text_data <- tibble(creature = c("tribble", "ewok"),
 #                              text = c("Hi, we're Tribbles! We were taken from our native planet, Iota Germinorum IV, and brought abroad Starfleet in stardate 4500. A Starfleet scientist, Edward Larkin, genetically engineered us to increase our reproductive rate in an attempt to solve a planetary food shortage. <br> <br> The Tribble population on Starfleet over the next 50 Stardates (equivalent to 1 week universe time) is illustrated in the graph. We need your help answering a few questions regarding the population of Tribbles.",
 # 
-#                                       "Hi, we're Ewoks! We are native to the forest moon of Endor. After the Galactic Civil War, some Ewoks traveled offworld to help Rebel veterens as 'therapy Ewoks' and began to repopulate. <br> <br> The Ewok population After the Battle of Yavin (ABY) is illustrated in the graph. We need your help answering a few questions regarding the population of Ewoks offworld."))
+#                                       "Hi, we're Ewoks! We are native to the forest moon of Endor. After the Galactic Civil War, some Ewoks traveled offworld to help Rebel veterans as 'therapy Ewoks' and began to repopulate. <br> <br> The Ewok population After the Battle of Yavin (ABY) is illustrated in the graph. We need your help answering a few questions regarding the population of Ewoks offworld."))
 # 
 # dbRemoveTable(db_con, "scenario_text_data")
 # dbWriteTable(db_con, "scenario_text_data", scenario_text_data)
