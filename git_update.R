@@ -1,6 +1,6 @@
 #!/usr/bin/Rscript
 # Sorry this isn't elegant but necessary for the cron tab to work
-setwd("~/Projects/Graphics/2022-log-scales-prolific/perception-of-statistical-graphics/")
+setwd("~/Projects/Graphics/2022-log-scales-prolific/")
 
 # Set up authentication via ssh
 cred <- git2r::cred_ssh_key("~/.ssh/id_rsa.pub", "~/.ssh/id_rsa")
@@ -18,13 +18,13 @@ modified <- names(tmp) == "modified"
 modified <- unlist(tmp[modified])
 
 # If db has been modified
-if ("databases/00_demographics_db.db" %in% modified |
-    "databases/01_lineups_db.db" %in% modified |
-    "databases/02_you_draw_it_db.db" %in% modified |
-    "databases/03_estimation_db.db" %in% modified) {
+if ("perception-of-statistical-graphics/databases/00_demographics_db.db" %in% modified |
+    "perception-of-statistical-graphics/databases/01_lineups_db.db" %in% modified |
+    "perception-of-statistical-graphics/databases/02_you_draw_it_db.db" %in% modified |
+    "perception-of-statistical-graphics/databases/03_estimation_db.db" %in% modified) {
 
   # Add changed db to commit and commit
-  git2r::add(repo = '..', list.files("databases", "*.db$", full.names = T))
+  git2r::add(repo = '.', list.files("perception-of-statistical-graphics/databases/", "*.db$", full.names = T))
   try(git2r::commit(message = "Update data", all = T))
 
   # Update
