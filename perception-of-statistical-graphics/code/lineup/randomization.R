@@ -13,10 +13,11 @@ library(DBI)
 sqlite.driver <- dbDriver("SQLite")
 
 filename <- "databases/01_lineups_db.db"
+
+# filename <- "perception-of-statistical-graphics/databases/01_lineups_db.db"
 con <- dbConnect(sqlite.driver, dbname = filename)
 picture_details_randomization<- dbReadTable(con, "picture_details")
 dbDisconnect(con)
-
 
 picture_details_randomization$set <- rep(c(1,1,2,2),num_param_values) 
 picture_details_randomization$rorschach <- substrRight(picture_details_randomization$param_value,1)
@@ -45,4 +46,4 @@ block_ids <- rbind(param_block_ids, rorschach_block_ids[sample(1:2,1),]) %>%
 
 joinCols = c("test_param", "param_value", "set")
 picture_details_order <- left_join(block_ids, picture_details_randomization, by = joinCols)
-
+# View(picture_details_order)
