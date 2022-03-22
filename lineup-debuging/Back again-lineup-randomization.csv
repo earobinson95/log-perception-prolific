@@ -1,0 +1,14 @@
+param_id,param_value,set,test_param,order,pic_id,sample_size,p_value,obs_plot_location,pic_name,experiment,difficulty,data_name,trial,rorschach
+5,target-H-Lv_null-E-Lv_r0,1,linear,1,25,50,1,1,plots/svg/3abe4bc02329ef5d724fd9ae7d438532.svg,emily-log-1,107,d5c6dd039c67d2cb6771b22aa1c6aaac,0,0
+3,target-M-Lv_null-E-Lv_r0,1,log,2,14,50,1,10,plots/svg/df10610fd0e27c50fe0db5b8ca04f080.svg,emily-log-1,204,8ad2ea6719790c191cedf1038d3cbca5,0,0
+4,target-M-Lv_null-H-Lv_r0,2,linear,3,23,50,1,13,plots/svg/a22fa470f1028ba1fa6fc5d121887a46.svg,emily-log-1,106,184b9f1a90081e0ffeedc112c6431d9c,0,0
+2,target-E-Lv_null-H-Lv_r0,1,log,4,10,50,1,15,plots/svg/b31a013dcd39fb18f0adb334dea600e1.svg,emily-log-1,203,d14de6e8946c29750256921ce0462931,0,0
+5,target-H-Lv_null-E-Lv_r0,1,log,5,26,50,1,1,plots/svg/929c1e7fdc8f70077cdaf06728393cf6.svg,emily-log-1,207,d5c6dd039c67d2cb6771b22aa1c6aaac,0,0
+1,target-E-Lv_null-E-Lv_r1,1,log,6,2,50,1,20,plots/svg/93509c8d2d701218e52d6268633467d9.svg,emily-log-1,201,3df0bf67267a04243730b6bea6242535,0,1
+1,target-E-Lv_null-M-Lv_r0,2,log,7,8,50,1,14,plots/svg/ef16f06ed4708fcd12a6249492a1e12a.svg,emily-log-1,202,e079c7c97296f2c777bede60f7d1c5b7,0,0
+3,target-M-Lv_null-E-Lv_r0,1,linear,8,13,50,1,10,plots/svg/5df2947852318075a066e55984da5020.svg,emily-log-1,104,8ad2ea6719790c191cedf1038d3cbca5,0,0
+4,target-M-Lv_null-H-Lv_r0,2,log,9,24,50,1,13,plots/svg/5e448cd61317e5499aee6d7ea7906c64.svg,emily-log-1,206,184b9f1a90081e0ffeedc112c6431d9c,0,0
+2,target-E-Lv_null-H-Lv_r0,1,linear,10,9,50,1,15,plots/svg/b3a9571d8982604b9f655471bfe04fc1.svg,emily-log-1,103,d14de6e8946c29750256921ce0462931,0,0
+1,target-E-Lv_null-M-Lv_r0,2,linear,11,7,50,1,14,plots/svg/19458f4a249031b8179c02b343dffe30.svg,emily-log-1,102,e079c7c97296f2c777bede60f7d1c5b7,0,0
+6,target-H-Lv_null-M-Lv_r0,2,linear,12,31,50,1,12,plots/svg/e9510e025a1152c8bc78255bdc926f93.svg,emily-log-1,108,b79bc1a0fdbb69edc87fe34883a066d6,0,0
+6,target-H-Lv_null-M-Lv_r0,2,log,13,32,50,1,12,plots/svg/39f08ba7613fc59a3b114a36a3a14244.svg,emily-log-1,208,b79bc1a0fdbb69edc87fe34883a066d6,0,0

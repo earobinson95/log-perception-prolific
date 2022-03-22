@@ -1,0 +1,192 @@
+---
+title: "Perception (Lineups)"
+author: "Emily Robinson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = FALSE
+)
+library(tidyverse)
+library(cowplot)
+library(digest)
+
+library(RSQLite)
+library(DBI)
+library(here)
+library(readr)
+
+library(lme4)
+library(emmeans)
+```
+
+# Data
+
+```{r}
+
+# user data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+users <- dbReadTable(db_con,"users")
+completed_sections <- dbReadTable(db_con,"completed_sections")
+dbDisconnect(db_con)
+
+# lineup data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
+lineups_feedback <- dbReadTable(db_con,"feedback")
+picture_details <- dbReadTable(db_con,"picture_details")
+dbDisconnect(db_con)
+
+# combine lineup feedback, user data
+joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
+lineup_data_orig <- right_join(users, lineups_feedback, by = joinCols)
+
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "pic_id", "param_value", "set", "test_param", "conf_level")
+lineup_data_orig[,factorCols] <- lapply(lineup_data_orig[,factorCols], factor)
+
+lineup_model_data <- lineup_data_orig %>%
+  filter(recruitment != "I am the researcher") %>%
+  separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
+  filter(target != null) %>%
+  mutate(curvature = paste0("t-", target, "_n-", null), .after = null) %>%
+  rowwise() %>%
+  mutate(dataset_id = as.factor(digest(paste(curvature, set, sep = "-"), "md5")), .after = set) %>%
+  mutate(participant_id = as.factor(digest(paste(nick_name, study_starttime, prolific_id, sep = "-"), "md5")), .before = curvature) %>%
+  rename(scale = test_param) %>%
+  group_by(nick_name, ip_address, study_starttime, prolific_id) %>%
+  mutate(n_lineups = n()) %>%
+  ungroup() %>%
+  # filter(n_lineups == 12) %>%
+  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no)
+```
+
+There are `r length(unique(lineup_model_data$prolific_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
+
+```{r}
+lineup_model_data %>%
+  select(prolific_id, age, gender, academic_study, set, curvature, scale, correct, response_no, response, conf_level) %>%
+  head() %>%
+  knitr::kable()
+```
+
+# Check Randomization
+
+```{r}
+lineup_model_data %>%
+  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  summarize(n = n()) %>%
+  filter(scale == "linear") %>% #, study_starttime > 1646860792.49417) %>%
+  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+              names_from = "curvature",
+              values_from = "n") %>%
+  arrange(study_starttime) %>%
+  knitr::kable(caption = "Linear Scale")
+```
+
+```{r}
+lineup_model_data %>%
+  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  summarize(n = n()) %>%
+  filter(scale == "log") %>% #, study_starttime > 1646860792.49417) %>%
+  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+              names_from = "curvature",
+              values_from = "n") %>%
+  arrange(study_starttime) %>%
+  knitr::kable(caption = "Log Scale")
+```
+
+# Analysis
+
+Target plot identification was analyzed using the `glmer` function in the `lme4` R package. 
+Estimates and odds ratio comparisons between the log and linear scales were calculated using the `emmeans` R package.
+Each lineup plot evaluated was assigned a value based on the participant response (correct = 1, not correct = 0).
+Define $Y_{ijkl}$ to be the event that participant $l = 1,...,N_{participant}$ correctly identifies the target plot for data set $k = 1,2$ with curvature combination $j = 1,2,3,4,5,6$ plotted on scale $i = 1,2$.
+The binary response was analyzed using a generalized linear mixed model following a binomial distribution with a logit link function with a row-column blocking design accounting for the variation due to participant and data set respectively as 
+\begin{equation}
+\text{logit }P(Y_{ijk}) = \eta + \delta_i + \gamma_j + \delta \gamma_{ij} + s_l + d_k
+\end{equation}
+\noindent where
+
++ $\eta$ is the baseline average probability of selecting the target plot
++ $\delta_i$ is the effect of scale $i = 1,2$
++ $\gamma_j$ is the effect of curvature combination $j = 1,2,3,4,5,6$
++ $\delta\gamma_{ij}$ is the two-way interaction between the $i^{th}$ scale and $j^{th}$ curvature combination
++ $s_l \sim N(0,\sigma^2_\text{participant})$is the random effect for participant characteristics
++ $d_k \sim N(0,\sigma^2_{\text{data}})$ is the random effect for data specific characteristics. 
+
+\noindent We assume that random effects for data set and participant are independent.
+
+```{r}
+glmm_mod <- glmer(response ~ curvature*scale + 
+                            (1 | participant_id) +
+                            (1 | dataset_id),
+                  data = lineup_model_data,
+                  family = binomial(link = "logit"))
+car::Anova(glmm_mod) %>% broom::tidy() %>% knitr::kable(digits = 3, caption = "Lineups GLMM ANOVA")
+```
+
+```{r, eval = F, include = F, fig.align = 'center', fig.width = 12, fig.height = 6}
+lineup_lsmeans <- emmeans(glmm_mod, specs = ~ "curvature:scale", type = "response") %>%
+  as_tibble()
+
+lineup_lsmeans %>%
+  mutate(curvature = factor(curvature, levels = c("t-E_n-H", "t-H_n-E", "t-E_n-M", "t-M_n-E", "t-M_n-H", "t-H_n-M"))) %>%
+  ggplot(aes(x = curvature, y = prob, group = scale)) +
+  geom_bar(stat = "identity", fill = "lightgray") +
+  # geom_text(aes(y = asymp.UCL + 0.05)) +
+  facet_wrap(~scale, ncol = 1) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.1) +
+  theme_bw() +
+  scale_y_continuous("Probability of target panel detected", limit = c(-0.05,1.1), breaks = seq(0,1,0.2)) +
+  scale_x_discrete("Curvature")
+```
+
+
+```{r, fig.align = 'center', fig.width = 12, fig.height = 6}
+lineups_or <- emmeans(glmm_mod, ~ scale | curvature, type = "response") %>% pairs(reverse = T, infer = c(T,T)) %>% as_tibble()
+
+dodge <- position_dodge(width=0.9)
+lineups_or_plot <- lineups_or %>%
+  separate(curvature, into = c(NA, "target", NA, "null")) %>%
+  mutate(null = factor(null, levels = c("E", "M", "H"), labels = c("High Curvature", "Medium Curvature", "Low Curvature")),
+         target = factor(target, levels = c("E", "M", "H"), labels = c("High Curvature", "Medium Curvature", "Low Curvature"))) %>%
+  ggplot(aes(x = odds.ratio, y = null, color = target, shape = target)) + 
+  geom_point(position = dodge, size = 3) + 
+  geom_errorbar(aes(xmin = asymp.LCL, xmax = asymp.UCL), position = dodge, width = .1) +
+  geom_vline(xintercept = 1) +
+  theme_bw()  +
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12),
+        legend.text  = element_text(size = 12),
+        legend.key.size = unit(1, "line"),
+        legend.position = "bottom"
+  ) +
+  scale_y_discrete("Null Panel Difficulty", position = "left") +
+  scale_x_continuous("Odds ratio (on log scale) \n (Log vs Linear)", trans = "log10", labels = scales::comma) + 
+  scale_color_manual("Target Panel Difficulty", values = c("#004400", "#116611", "#55aa55")) + 
+  scale_shape_discrete("Target Panel Difficulty")
+
+picsList <- c("images/tM_nH.png", "images/tE_nH.png", 
+              "images/tH_nM.png", "images/tE_nM.png", 
+              "images/tH_nE.png", "images/tM_nE.png"
+)
+
+pimage <- axis_canvas(lineups_or_plot, axis = 'y') + 
+  draw_image(picsList[1], y = 2.75, scale = 0.7) +
+  draw_image(picsList[2], y = 2.25, scale = 0.7) +
+  draw_image(picsList[3], y = 1.75, scale = 0.7) +
+  draw_image(picsList[4], y = 1.25, scale = 0.7) +
+  draw_image(picsList[5], y = 0.75, scale = 0.7) +
+  draw_image(picsList[6], y = 0.25, scale = 0.7)
+
+# insert the image strip into the plot
+ggdraw(insert_yaxis_grob(lineups_or_plot, pimage, position = "right", clip = "on"))
+```
+
+
+

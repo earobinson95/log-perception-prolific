@@ -1,5 +1,5 @@
 ---
-title: "Perception (Lineups)"
+title: "Prediction (You Draw It)"
 author: "Emily Robinson"
 date: "Spring 2022"
 output: html_document
@@ -32,13 +32,15 @@ users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
-# lineup data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
-lineups_feedback <- dbReadTable(db_con,"feedback")
-picture_details <- dbReadTable(db_con,"picture_details")
+# you draw it data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/02_you_draw_it_db.db"))
+youdrawit_feedback <- dbReadTable(db_con,"feedback")
+youdrawit_simulated <- dbReadTable(db_con, "simulated_data")
 dbDisconnect(db_con)
 
-# combine lineup feedback, user data
+
+
+# combine you draw it feedback, user data
 joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
 lineup_data_orig <- right_join(users, lineups_feedback, by = joinCols)
 
@@ -66,38 +68,3 @@ lineup_model_data %>%
   head() %>%
   knitr::kable()
 ```
-
-# Check Randomization
-
-### linear scale
-
-```{r}
-lineup_model_data %>%
-  group_by(prolific_id, study_starttime, curvature, scale) %>%
-  summarize(n = n()) %>%
-  filter(scale == "linear") %>% #, study_starttime > 1646860792.49417) %>%
-  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
-              names_from = "curvature",
-              values_from = "n") %>%
-  arrange(study_starttime) %>%
-  knitr::kable()
-```
-
-### log scale
-
-```{r}
-lineup_model_data %>%
-  group_by(prolific_id, study_starttime, curvature, scale) %>%
-  summarize(n = n()) %>%
-  filter(scale == "log") %>% #, study_starttime > 1646860792.49417) %>%
-  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
-              names_from = "curvature",
-              values_from = "n") %>%
-  arrange(study_starttime) %>%
-  knitr::kable()
-```
-
-# Analysis
-
-
-
