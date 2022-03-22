@@ -9,14 +9,17 @@ output: html_document
 knitr::opts_chunk$set(
 	echo = FALSE,
 	message = FALSE,
-	warning = FALSE
+	warning = FALSE,
+	fig.align = 'center'
 )
 library(tidyverse)
+`%notin%` <- Negate(`%in%`)
 
 library(RSQLite)
 library(DBI)
 library(here)
 library(readr)
+library(digest)
 
 library(lme4)
 library(emmeans)
@@ -34,37 +37,182 @@ dbDisconnect(db_con)
 
 # you draw it data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/02_you_draw_it_db.db"))
-youdrawit_feedback <- dbReadTable(db_con,"feedback")
+youdrawit_feedback <- dbReadTable(db_con,"feedback") %>%
+  filter(parm_id %notin% c("F", "S", "N", "V"))
 youdrawit_simulated <- dbReadTable(db_con, "simulated_data")
 dbDisconnect(db_con)
 
-
-
 # combine you draw it feedback, user data
 joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
-lineup_data_orig <- right_join(users, lineups_feedback, by = joinCols)
-
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "pic_id", "param_value", "set", "test_param", "conf_level")
-lineup_data_orig[,factorCols] <- lapply(lineup_data_orig[,factorCols], factor)
-
-lineup_model_data <- lineup_data_orig %>%
+youdrawit_data_orig <- right_join(users, youdrawit_feedback, by = joinCols)  %>%
   # filter(recruitment != "I am the researcher") %>%
-  separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
-  filter(target != null) %>%
-  mutate(curvature = paste(target, null, sep = "-"), .after = null) %>%
-  rename(scale = test_param) %>%
-  group_by(nick_name, ip_address, study_starttime, prolific_id) %>%
-  mutate(n_lineups = n()) %>%
-  ungroup() %>%
-  # filter(n_lineups == 12) %>%
-  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no)
+  filter(parm_id %notin% c("F", "S", "N", "V")) %>%
+  rename(ynls = y) %>%
+  separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
+  select(-linear) %>%
+  mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5"), .after = prolific_id) %>%
+  mutate(plot_id = digest(paste(nick_name, ip_address, study_starttime, prolific_id, start_time, end_time, beta, points_truncated, scale, sep = "-"), "md5"), .after = prolific_id)
+
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "plot_id", "beta", "points_truncated", "scale")
+youdrawit_data_orig[,factorCols] <- lapply(youdrawit_data_orig[,factorCols], factor)
+
+
+# fit loess smoother
+loess_models <- youdrawit_data_orig %>%
+  as_tibble() %>%
+  # tidyr::nest(-plot_id) %>%
+  tidyr::nest(data = c(nick_name, ip_address, study_starttime, prolific_id, participant_id, 
+    age, gender, academic_study, computer_mouse, recruitment, 
+    beta, points_truncated, scale, x, ynls, ydrawn, start_time, 
+    end_time)) %>%
+  dplyr::mutate(loess_fit = purrr::map(data, loess, formula = ydrawn ~ x),
+                yloess = purrr::map(loess_fit, `[[`, "fitted"))
+
+# apply fitted y's as a new column
+youdrawit_model_data <- loess_models %>%
+        dplyr::select(-loess_fit) %>%
+        tidyr::unnest(cols = c(data, yloess)) %>%
+  mutate(residual_nls_drawn = ydrawn - ynls,
+         residual_nls_loess = yloess - ynls) %>%
+  select(nick_name, ip_address, study_starttime, prolific_id, age, gender, academic_study, computer_mouse, recruitment, participant_id, plot_id, beta, points_truncated, scale, start_time, end_time, x, ynls, ydrawn, yloess, residual_nls_drawn, residual_nls_loess)
+
+# simulated data
+youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols)  %>%
+  # filter(recruitment != "I am the researcher") %>%
+  filter(parm_id %notin% c("F", "S", "N", "V")) %>%
+  separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
+  mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
+  rowwise() %>%
+  mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, beta, points_truncated, scale, sep = "-"), "md5")), .before = beta) %>%
+  mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = data_id)
+
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
+youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
 ```
 
-There are `r length(unique(lineup_model_data$prolific_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
+There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
 
 ```{r}
-lineup_model_data %>%
-  select(prolific_id, age, gender, academic_study, set, curvature, scale, correct, response_no, response, conf_level) %>%
+# write.csv(youdrawit_model_data, file = here("analyses/02a-you-draw-it/data/youdrawit-model-data.csv"), row.names = F, na = "")
+# write.csv(youdrawit_simulated_data, file = here("analyses/02a-you-draw-it/data/youdrawit-simulated-data.csv"), row.names = F, na = "")
+
+youdrawit_model_data %>%
+  select(participant_id, beta, points_truncated, scale, x, ynls, ydrawn, yloess, residual_nls_drawn) %>%
   head() %>%
   knitr::kable()
 ```
+
+# Raw Plots
+
+```{r, fig.width = 12, fig.height = 60}
+youdrawit_model_data %>%
+  ggplot(aes(x = x)) +
+  geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black") +
+  geom_line(aes(y = ydrawn, group = interaction(plot_id, scale), color = scale)) +
+  geom_point(data = youdrawit_simulated_data %>% filter(dataset == "point_data"), aes(y = y), size = 0.8, color = "gray30", shape = 1) +
+  facet_grid(participant_id ~ beta + points_truncated) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "darkorange"))
+```
+
+```{r}
+youdrawit_model_data %>%
+  ggplot(aes(x = x)) +
+  geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black", alpha = 0.5) +
+  geom_line(aes(y = ydrawn, group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  # geom_point(data = youdrawit_simulated_data %>% filter(dataset == "point_data"), size = 0.8, color = "gray30", shape = 1) +
+  facet_grid(beta ~ points_truncated, scales = "free_y") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "darkorange"))
+```
+
+# Residual Plots
+
+```{r}
+youdrawit_model_data %>%
+  ggplot(aes(x = x, y = residual_nls_drawn)) +
+  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), color = 'black', linetype = 'dashed') +
+  facet_grid(beta ~ points_truncated, scales = "free_y") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "darkorange")) +
+  ggtitle("Drawn Residuals")
+
+youdrawit_model_data %>%
+  ggplot(aes(x = x, y = residual_nls_loess)) +
+  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), color = 'black', linetype = 'dashed') +
+  facet_grid(beta ~ points_truncated, scales = "free_y") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "darkorange")) +
+  ggtitle("Loess Residuals")
+```
+
+# Smoothing Splines (GAMM)
+
+```{r, eval = F, echo = T}
+#tic()
+exp.gamm.reduced <- bam(residualdrawn ~ -1 + beta:points_truncated:scale + 
+                        s(x, by = beta:points_truncated:scale) +
+                        s(participant_id, bs = "re") +
+                        s(x,participant_id, bs = "re"),
+                        method = "REML",
+                        data = exp_data)
+plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
+# toc()
+# summary(exp.gamm.reduced)
+# anova(exp.gamm.reduced)
+
+# Obtain Predictions
+grid_data.exp.reduced <- expand_grid(beta = c("0.1", "0.23"),
+                         points_truncated = c("10", "15"),
+                         scale = c("Linear", "Log"),
+                         x = seq(10,20, 0.5),
+                         participant_id = exp_data$participant_id[1])
+preds.exp.reduced <- predict_gamm(exp.gamm.reduced, newdata = grid_data.exp.reduced, se = T, re_form = NA)
+grid_data.exp.reduced$estimate <- preds.exp.reduced$prediction
+grid_data.exp.reduced$lower <- preds.exp.reduced$prediction - (1.96 * preds.exp.reduced$se)
+grid_data.exp.reduced$upper <- preds.exp.reduced$prediction + (1.96 * preds.exp.reduced$se)
+# head(grid_data.exp.reduced)
+```
+
+```{r, eval = F, echo = T}
+# Plot Predictions
+write.csv(grid_data.exp.reduced, file = "results/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
+
+grid_data.exp.reduced %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.4) +
+  geom_line() +
+  geom_line(data = exp_data, aes(x = x, y = residualdrawn, group = plotID), alpha = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+
+# Plot Predictions
+grid_data.exp.reduced %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.4) +
+  geom_line() +
+  # geom_line(data = exp_data, aes(x = x, y = residualdrawn, group = plotID), alpha = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+```
+
+
+
