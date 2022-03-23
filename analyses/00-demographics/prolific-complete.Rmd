@@ -42,16 +42,21 @@ completed_sections <- completed_sections_orig %>%
               values_from = time)
 
 demographic_data <- full_join(users, completed_sections, by = c("nick_name", "ip_address", "study_starttime"))  %>%
+  rename(you_draw_it = `you-draw-it`) %>%
   mutate(lineups = ifelse(lineups == "NULL", NA, lineups),
-         `you-draw-it` = ifelse(`you-draw-it` == "NULL", NA, `you-draw-it`),
+         you_draw_it = ifelse(you_draw_it == "NULL", NA, you_draw_it),
          estimation = ifelse(estimation == "NULL", NA, estimation)) %>%
-  mutate(studies_complete = as.numeric(!is.na(lineups)) + as.numeric(!is.na(`you-draw-it`)) + as.numeric(!is.na(estimation))) %>%
+  mutate(studies_complete = as.numeric(!is.na(lineups)) + as.numeric(!is.na(you_draw_it)) + as.numeric(!is.na(estimation))) %>%
   arrange(-studies_complete)
 ```
+
++ Lineups Complete: `r demographic_data %>% filter(!is.na(lineups)) %>% nrow()`
++ You Draw It Complete: `r demographic_data %>% filter(!is.na(you_draw_it)) %>% nrow()`
++ Estimation: `r demographic_data %>% filter(!is.na(estimation)) %>% nrow()`
 
 ```{r}
 demographic_data %>%
   filter(recruitment != "I am the researcher") %>%
-  select(recruitment, prolific_id, studies_complete, informed_consent,	demographics,	lineups,	`you-draw-it`,	estimation) %>%
+  select(recruitment, prolific_id, studies_complete, informed_consent,	demographics,	lineups,	you_draw_it,	estimation) %>%
   knitr::kable()
 ```
