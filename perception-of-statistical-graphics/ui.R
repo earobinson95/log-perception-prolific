@@ -155,7 +155,7 @@ navbarPage("Perception of Statistical Graphics", id = "inNavBar", inverse = TRUE
           inputUserid("nickname"),
           
           textInput("prolificID", "Prolific ID", ""),
-          helpText("If you are not from prolific, feel free to enter any text or number."),
+          helpText(h6("If you are not from prolific, please enter any text or number above.")),
           
           selectizeInput("age", "Age Range",
                           choices = c("", 
