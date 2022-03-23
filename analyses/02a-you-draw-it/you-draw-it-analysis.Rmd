@@ -33,13 +33,13 @@ source("gamm-predict-function.R")
 
 ```{r}
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
 # you draw it data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/02_you_draw_it_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/02_you_draw_it_db.db"))
 youdrawit_feedback <- dbReadTable(db_con,"feedback") %>%
   filter(parm_id %notin% c("F", "S", "N", "V"))
 youdrawit_simulated <- dbReadTable(db_con, "simulated_data")

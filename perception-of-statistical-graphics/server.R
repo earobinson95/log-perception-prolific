@@ -227,7 +227,7 @@ shinyServer(function(input, output, session) {
       consent_complete <- tibble(nick_name        = input$nickname,
                                  ip_address       = input$ipid,
                                  study_starttime  = study_starttime,
-                                 prolific_id      = NA,
+                                 prolific_id      = "not filled",
                                  time             = now(),
                                  section_complete = "informed_consent"
       )
@@ -478,7 +478,7 @@ shinyServer(function(input, output, session) {
           lineup_feedback <- data.frame(ip_address      = input$ipid, 
                                         nick_name       = input$nickname,
                                         study_starttime = study_starttime,
-                                        prolific_id     = input$prolificID %>% as.character(),
+                                        prolific_id     = as.character(input$prolificID),
                                         order           = lineup_values$order,
                                         start_time      = lineup_values$starttime, 
                                         end_time        = now(),
@@ -487,7 +487,7 @@ shinyServer(function(input, output, session) {
                                         set             = lineup_values$set,
                                         test_param      = lineup_values$scale,
                                         correct         = lineup_values$correct,
-                                        response_no     = lineup_values$choice,
+                                        response_no     = as.character(lineup_values$choice),
                                         conf_level      = input$certain,
                                         choice_reason   = reason
                                         )
@@ -649,7 +649,7 @@ shinyServer(function(input, output, session) {
           mutate(ip_address = input$ipid,
                  nick_name = input$nickname,
                  study_starttime = study_starttime,
-                 prolific_id = input$prolificID %>% as.character(),
+                 prolific_id = as.character(input$prolificID),
                  parm_id = as.character(parm_id)
           )
         
@@ -732,7 +732,7 @@ shinyServer(function(input, output, session) {
           test <- drawn_data() %>%
             mutate(nick_name       = input$nickname,
                    ip_address      = input$ipid,
-                   prolific_id     = input$prolificID %>% as.character(),
+                   prolific_id     = as.character(input$prolificID),
                    study_starttime = study_starttime,
                    start_time      = you_draw_it_values$starttime,
                    end_time        = now(),
@@ -1032,7 +1032,7 @@ shinyServer(function(input, output, session) {
         
         response_data <-    tibble(nick_name       = input$nickname,
                                    ip_address      = input$ipid,
-                                   prolific_id     = input$prolificID %>% as.character(),
+                                   prolific_id     = as.character(input$prolificID),
                                    study_starttime = study_starttime,
                                    start_time      = estimation_values$starttime,
                                    end_time        = now(),
@@ -1092,7 +1092,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$calcEval, {
       calc_data <-    tibble(nick_name       = input$nickname,
                              ip_address      = input$ipid,
-                             prolific_id     = input$prolificID %>% as.character(),
+                             prolific_id     = as.character(input$prolificID),
                              study_starttime = study_starttime,
                              q_id            = estimation_values$q_id,
                              creature        = estimation_values$creature_name,

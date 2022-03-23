@@ -33,13 +33,13 @@ library(tictoc)
 
 ```{r}
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
 # estimation data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/03_estimation_db.db"))
 # dbListTables(db_con)
 estimation_feedback <- dbReadTable(db_con,"feedback")
 estimation_calcfeedback <- dbReadTable(db_con,"calc_feedback")

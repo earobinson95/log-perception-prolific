@@ -69,7 +69,7 @@ feedback <- dbReadTable(db_con,"feedback")
 #                    linear     = NA,
 #                    nick_name  = "test",
 #                    ip_address = "test",
-#                    prolific_id = "",
+#                    prolific_id = "test",
 #                    study_starttime = NA,
 #                    start_time = NA,
 #                    end_time   = NA
@@ -102,7 +102,7 @@ simulated_data <- dbReadTable(db_con,"simulated_data")
 #                          ip_address = "test",
 #                          nick_name  = "test",
 #                          study_starttime = NA,
-#                          prolific_id = ""
+#                          prolific_id = "test"
 #                          )
 # simulated_data <- simulated_data[0,]
 # dbRemoveTable(db_con, "simulated_data")
