@@ -3,6 +3,8 @@ This repository contains the series of final graphical testing applets for log p
 
 Complete study [here](https://shiny.srvanderplas.com/perception-of-statistical-graphics/).
 
+[Participants Completion Check](https://earobinson95.github.io/log-perception-prolific/analyses/00-demographics/prolific-complete.html)
+
 **Analyses**
 
 + [Perception - Lineups](https://earobinson95.github.io/log-perception-prolific/analyses/01-lineups/lineups-analysis.html)
