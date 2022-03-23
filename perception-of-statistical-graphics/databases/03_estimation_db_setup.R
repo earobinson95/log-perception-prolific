@@ -142,7 +142,7 @@ estimation_questions <- dbReadTable(db_con, "estimation_questions")
 # 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta)/(true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
 # 
-#                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin,
+#                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta - 10,
 # 
 #                                               NA,
 # 
@@ -156,7 +156,7 @@ estimation_questions <- dbReadTable(db_con, "estimation_questions")
 # 
 #                                               (true_parameters$alpha*exp(true_parameters$beta*(3040 - true_parameters$xmin)) + true_parameters$theta)/(true_parameters$alpha*exp(true_parameters$beta*(3020 - true_parameters$xmin)) + true_parameters$theta),
 # 
-#                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta + true_parameters$xmin
+#                                               log((((true_parameters$alpha*exp(true_parameters$beta*(3010 - true_parameters$xmin)) + true_parameters$theta)*2) - true_parameters$theta)/true_parameters$alpha)/true_parameters$beta - 10
 # 
 #                                )
 #                                )
