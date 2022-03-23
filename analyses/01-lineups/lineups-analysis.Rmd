@@ -30,13 +30,13 @@ library(emmeans)
 ```{r}
 
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
-completed_sections <- dbReadTable(db_con,"completed_sections")
+completed_sections <- dbReadTable(db_con,"completed_sections") %>% filter(section_complete == "lineups")
 dbDisconnect(db_con)
 
 # lineup data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/01_lineups_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
 lineups_feedback <- dbReadTable(db_con,"feedback")
 picture_details <- dbReadTable(db_con,"picture_details")
 dbDisconnect(db_con)
@@ -49,7 +49,8 @@ factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "acad
 lineup_data_orig[,factorCols] <- lapply(lineup_data_orig[,factorCols], factor)
 
 lineup_model_data <- lineup_data_orig %>%
-  filter(recruitment != "I am the researcher") %>%
+  filter(recruitment != "I am the researcher",
+         prolific_id != "Too Many Users Sorry, but this application has exceeded its quota of concurrent users. Please try again later.") %>%
   separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
   filter(target != null) %>%
   mutate(curvature = paste0("t-", target, "_n-", null), .after = null) %>%
@@ -61,7 +62,9 @@ lineup_model_data <- lineup_data_orig %>%
   mutate(n_lineups = n()) %>%
   ungroup() %>%
   # filter(n_lineups == 12) %>%
-  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no)
+  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no) %>%
+  full_join(completed_sections, by = c("nick_name", "ip_address", "prolific_id", "study_starttime")) %>%
+  filter(!is.na(section_complete))
 ```
 
 There are `r length(unique(lineup_model_data$prolific_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
