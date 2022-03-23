@@ -1,0 +1,79 @@
+---
+title: "Estimation (Numeric Translation)"
+author: "Emily Robinson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE
+)
+library(tidyverse)
+library(digest)
+
+library(RSQLite)
+library(DBI)
+library(here)
+library(readr)
+
+library(lme4)
+library(emmeans)
+library(tictoc)
+```
+
+# Data
+
+```{r}
+# user data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+users <- dbReadTable(db_con,"users")
+completed_sections <- dbReadTable(db_con,"completed_sections")
+dbDisconnect(db_con)
+
+# estimation data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
+dbListTables(db_con)
+estimation_feedback <- dbReadTable(db_con,"feedback")
+estimation_calcfeedback <- dbReadTable(db_con,"calc_feedback")
+estimation_questions <- dbReadTable(db_con,"estimation_questions")
+estimation_scenario_text <- dbReadTable(db_con,"scenario_text_data")
+estimation_simulated_data <- dbReadTable(db_con,"simulated_data")
+estimation_parameters <- dbReadTable(db_con,"true_parameters")
+dbDisconnect(db_con)
+
+# combine estimation and user data
+joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
+
+# feedback data
+estimation_model_data <- right_join(users, estimation_feedback, by = joinCols) %>%
+  left_join(estimation_questions, by = c("q_id", "creature")) %>%
+  filter(recruitment != "I am the researcher")
+
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "q_id", "creature", "dataset", "scale")
+estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
+
+# write.csv(estimation_model_data, file = here("analyses/03-estimation/data/estimation-model-data.csv"), row.names = F, na = "")
+
+# read in estimation_model_data
+# estimation_model_data     <- read.csv(here("analyses/03-estimation/data/estimation-model-data.csv"))
+```
+
+## Visuals
+
+```{r visuals, fig.width = 9, fig.height = 9}
+
+estimation_questions %>% knitr::kable()
+
+estimation_model_data %>%
+  filter(q_id != "Q0", prolific_id != 186230) %>%
+  ggplot(aes(x = scale, y = as.numeric(response), color = prolific_id)) +
+  geom_jitter(width = 0.2) +
+  geom_hline(aes(yintercept = true_value), linetype = "dashed") +
+  facet_wrap(~q_id, scales = "free") +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+```

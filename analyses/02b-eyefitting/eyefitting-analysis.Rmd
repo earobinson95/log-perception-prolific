@@ -23,6 +23,13 @@ library(readr)
 
 library(lme4)
 library(emmeans)
+
+library(openssl)
+library(mgcv)
+library(lme4)
+library(tictoc)
+
+source("gamm-predict-function.R")
 ```
 
 # Data

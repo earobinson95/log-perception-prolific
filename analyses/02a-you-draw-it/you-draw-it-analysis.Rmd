@@ -21,14 +21,17 @@ library(here)
 library(readr)
 library(digest)
 
+library(openssl)
+library(mgcv)
 library(lme4)
-library(emmeans)
+library(tictoc)
+
+source("gamm-predict-function.R")
 ```
 
 # Data
 
 ```{r}
-
 # user data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
@@ -90,6 +93,10 @@ youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols
 
 factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
 youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
+
+# read in youdrawit_model_data and eyefitting_simulated_data
+# youdrawit_model_data     <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-model-data.csv"))
+# youdrawit_simulated_data <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-simulated-data.csv"))
 ```
 
 There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
