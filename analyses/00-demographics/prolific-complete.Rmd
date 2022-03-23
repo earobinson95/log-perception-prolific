@@ -1,0 +1,57 @@
+---
+title: "Prolific Complete"
+author: "Emily Robinson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	fig.align = 'center',
+	fig.width = 9,
+	fig.height = 6
+)
+library(tidyverse)
+library(plotly)
+library(digest)
+
+library(RSQLite)
+library(DBI)
+library(here)
+library(readr)
+
+library(lme4)
+library(emmeans)
+library(tictoc)
+```
+
+```{r}
+# user data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+users <- dbReadTable(db_con,"users")
+completed_sections_orig <- dbReadTable(db_con,"completed_sections")
+dbDisconnect(db_con)
+
+completed_sections <- completed_sections_orig %>%
+  pivot_wider(id_cols = c("nick_name", "ip_address", "study_starttime"),
+              names_from = "section_complete",
+              values_from = time)
+
+demographic_data <- full_join(users, completed_sections, by = c("nick_name", "ip_address", "study_starttime"))  %>%
+  mutate(lineups = ifelse(lineups == "NULL", NA, lineups),
+         `you-draw-it` = ifelse(`you-draw-it` == "NULL", NA, `you-draw-it`),
+         estimation = ifelse(estimation == "NULL", NA, estimation)) %>%
+  mutate(studies_complete = as.numeric(!is.na(lineups)) + as.numeric(!is.na(`you-draw-it`)) + as.numeric(!is.na(estimation))) %>%
+  arrange(-studies_complete)
+```
+
+```{r}
+demographic_data %>%
+  filter(recruitment != "I am the researcher") %>%
+  select(recruitment, prolific_id, studies_complete, informed_consent,	demographics,	lineups,	`you-draw-it`,	estimation) %>%
+  knitr::kable()
+```
