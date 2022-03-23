@@ -33,18 +33,18 @@ library(tictoc)
 
 ```{r}
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
 # estimation data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/03_estimation_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
 # dbListTables(db_con)
 estimation_feedback <- dbReadTable(db_con,"feedback")
 estimation_calcfeedback <- dbReadTable(db_con,"calc_feedback")
 estimation_questions <- dbReadTable(db_con,"estimation_questions") %>%
-  mutate(true_value = ifelse(q_id == "QI3", as.numeric(true_value) - 3010, true_value))
+  mutate(true_value = ifelse(q_id == "QI3", as.numeric(true_value), true_value))
 estimation_scenario_text <- dbReadTable(db_con,"scenario_text_data")
 estimation_simulated_data <- dbReadTable(db_con,"simulated_data")
 estimation_parameters <- dbReadTable(db_con,"true_parameters")
@@ -75,13 +75,13 @@ estimation_model_data %>%
 
 ## Visuals
 
-```{r visuals, include = F, fig.width = 9, fig.height = 9}
+```{r visuals, eval = F, fig.width = 9, fig.height = 9}
 
 estimation_questions %>% knitr::kable()
 
 estimation_model_data %>%
   filter(q_id != "Q0", prolific_id != 186230) %>%
-  ggplot(aes(x = scale, y = as.numeric(response), color = prolific_id)) +
+  ggplot(aes(x = scale, y = as.numeric(response))) +
   geom_jitter(width = 0.2) +
   geom_hline(aes(yintercept = true_value), linetype = "dashed") +
   facet_wrap(~q_id, scales = "free") +
@@ -90,7 +90,7 @@ estimation_model_data %>%
 ```
 
 
-```{r}
+```{r, eval = T, fig.height = 92, fig.width = 12}
 
 estimationPlots <- function(qID){
   

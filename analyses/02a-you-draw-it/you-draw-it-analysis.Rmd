@@ -33,13 +33,13 @@ source("gamm-predict-function.R")
 
 ```{r}
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
 # you draw it data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/02_you_draw_it_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/02_you_draw_it_db.db"))
 youdrawit_feedback <- dbReadTable(db_con,"feedback") %>%
   filter(parm_id %notin% c("F", "S", "N", "V"))
 youdrawit_simulated <- dbReadTable(db_con, "simulated_data")
@@ -82,17 +82,17 @@ youdrawit_model_data <- loess_models %>%
   select(nick_name, ip_address, study_starttime, prolific_id, age, gender, academic_study, computer_mouse, recruitment, participant_id, plot_id, beta, points_truncated, scale, start_time, end_time, x, ynls, ydrawn, yloess, residual_nls_drawn, residual_nls_loess)
 
 # simulated data
-youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols)  %>%
-  # filter(recruitment != "I am the researcher") %>%
-  filter(parm_id %notin% c("F", "S", "N", "V")) %>%
-  separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
-  mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
-  rowwise() %>%
-  mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, beta, points_truncated, scale, sep = "-"), "md5")), .before = beta) %>%
-  mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = data_id)
+# youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols)  %>%
+#   # filter(recruitment != "I am the researcher") %>%
+#   filter(parm_id %notin% c("F", "S", "N", "V")) %>%
+#   separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
+#   mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
+#   rowwise() %>%
+#   mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, beta, points_truncated, scale, sep = "-"), "md5")), .before = beta) %>%
+#   mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = data_id)
 
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
-youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
+# factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
+# youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
 
 # read in youdrawit_model_data and eyefitting_simulated_data
 # youdrawit_model_data     <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-model-data.csv"))
@@ -113,7 +113,7 @@ youdrawit_model_data %>%
 
 # Raw Plots
 
-```{r, fig.width = 12, fig.height = 60}
+```{r, fig.width = 12, fig.height = 60, eval = F, include = F}
 youdrawit_model_data %>%
   ggplot(aes(x = x)) +
   geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black") +
@@ -128,8 +128,8 @@ youdrawit_model_data %>%
 ```{r}
 youdrawit_model_data %>%
   ggplot(aes(x = x)) +
-  geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black", alpha = 0.5) +
-  geom_line(aes(y = ydrawn, group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black", alpha = 0.05) +
+  geom_line(aes(y = ydrawn, group = interaction(plot_id, scale), color = scale), alpha = 0.05) +
   # geom_point(data = youdrawit_simulated_data %>% filter(dataset == "point_data"), size = 0.8, color = "gray30", shape = 1) +
   facet_grid(beta ~ points_truncated, scales = "free_y") +
   theme_bw() +
@@ -142,7 +142,7 @@ youdrawit_model_data %>%
 ```{r}
 youdrawit_model_data %>%
   ggplot(aes(x = x, y = residual_nls_drawn)) +
-  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.05) +
   geom_hline(aes(yintercept = 0), color = 'black', linetype = 'dashed') +
   facet_grid(beta ~ points_truncated, scales = "free_y") +
   theme_bw() +
@@ -152,7 +152,7 @@ youdrawit_model_data %>%
 
 youdrawit_model_data %>%
   ggplot(aes(x = x, y = residual_nls_loess)) +
-  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.5) +
+  geom_line(aes(group = interaction(plot_id, scale), color = scale), alpha = 0.05) +
   geom_hline(aes(yintercept = 0), color = 'black', linetype = 'dashed') +
   facet_grid(beta ~ points_truncated, scales = "free_y") +
   theme_bw() +
