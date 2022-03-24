@@ -90,7 +90,7 @@ estimation_model_data %>%
 ```
 
 
-```{r, eval = T, fig.height = 92, fig.width = 12}
+```{r, eval = T, fig.height = 80, fig.width = 12}
 
 estimationPlots <- function(qID){
   
