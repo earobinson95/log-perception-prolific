@@ -2,7 +2,14 @@
 title: "Perception (Lineups)"
 author: "Emily Robinson"
 date: "Spring 2022"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: lumen
 ---
 
 ```{r setup, include=FALSE}
@@ -27,78 +34,115 @@ library(emmeans)
 
 # Data
 
-```{r}
+```{r, eval = F}
 
 # user data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
-users <- dbReadTable(db_con,"users")
-completed_sections <- dbReadTable(db_con,"completed_sections") %>% filter(section_complete == "lineups")
+
+users <- dbReadTable(db_con,"users") %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
+completed_sections_orig <- dbReadTable(db_con,"completed_sections") %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
 dbDisconnect(db_con)
+
+completed_lineups <- completed_sections_orig %>%
+  filter(section_complete == "lineups")
+
+completed_sections_all <- completed_sections_orig %>%
+  pivot_wider(id_cols = c("nick_name", "ip_address", "study_starttime"),
+              names_from = "section_complete",
+              values_from = time)
+
+demographic_data <- full_join(users, completed_sections_all, by = c("nick_name", "ip_address", "study_starttime"))  %>%
+  rename(you_draw_it = `you-draw-it`) %>%
+  mutate(lineups = ifelse(is.null(lineups), NA, lineups),
+         you_draw_it = ifelse(is.null(you_draw_it), NA, you_draw_it),
+         estimation = ifelse(is.null(estimation), NA, estimation)) %>%
+  mutate(studies_complete = as.numeric(!is.na(lineups)) + as.numeric(!is.na(you_draw_it)) + as.numeric(!is.na(estimation))) %>%
+  arrange(-studies_complete)
+
+all_participants <- demographic_data %>% filter(studies_complete == 3, recruitment != "I am the researcher") %>%
+  select(participant_id) %>%
+  as.vector()
+lineup_participants <- demographic_data %>% filter(studies_complete == 1, recruitment != "I am the researcher")
 
 # lineup data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
-lineups_feedback <- dbReadTable(db_con,"feedback")
+
+lineups_feedback <- dbReadTable(db_con,"feedback")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
 picture_details <- dbReadTable(db_con,"picture_details")
+
 dbDisconnect(db_con)
 
-# combine lineup feedback, user data
-joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
-lineup_data_orig <- right_join(users, lineups_feedback, by = joinCols)
+# combine lineup feedback and user data
+joinCols <- c("participant_id", "nick_name", "ip_address", "study_starttime", "prolific_id")
+lineup_data_orig <- users %>%
+  full_join(completed_lineups, by = c("participant_id", "study_starttime", "nick_name", "ip_address", "prolific_id")) %>%
+  filter(recruitment != "I am the researcher") %>%
+  right_join(lineups_feedback, by = joinCols)
 
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "pic_id", "param_value", "set", "test_param", "conf_level")
+factorCols <- c("participant_id", "nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "pic_id", "param_value", "set", "test_param", "conf_level")
 lineup_data_orig[,factorCols] <- lapply(lineup_data_orig[,factorCols], factor)
 
 lineup_model_data <- lineup_data_orig %>%
-  filter(recruitment != "I am the researcher",
-         prolific_id != "Too Many Users Sorry, but this application has exceeded its quota of concurrent users. Please try again later.") %>%
   separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
   filter(target != null) %>%
   mutate(curvature = paste0("t-", target, "_n-", null), .after = null) %>%
   rowwise() %>%
   mutate(dataset_id = as.factor(digest(paste(curvature, set, sep = "-"), "md5")), .after = set) %>%
-  mutate(participant_id = as.factor(digest(paste(nick_name, study_starttime, prolific_id, sep = "-"), "md5")), .before = curvature) %>%
   rename(scale = test_param) %>%
-  group_by(nick_name, ip_address, study_starttime, prolific_id) %>%
+  mutate(binary_response = ifelse(correct %in% as.numeric(unlist(strsplit(response_no, split = ","))), 1, 0), .after = response_no) %>%
+  group_by(participant_id, nick_name, ip_address, study_starttime, prolific_id) %>%
   mutate(n_lineups = n()) %>%
   ungroup() %>%
-  # filter(n_lineups == 12) %>%
-  mutate(response = ifelse(correct == response_no, 1, 0), .after = response_no) %>%
-  full_join(completed_sections, by = c("nick_name", "ip_address", "prolific_id", "study_starttime")) %>%
-  filter(!is.na(section_complete))
+  filter(!is.na(section_complete)) %>%
+  # filter(participant_id %in% all_participants$participant_id) %>%
+  select(participant_id, n_lineups, age, gender, academic_study, computer_mouse, recruitment, dataset_id, set, curvature, target, null, scale, correct, response_no, binary_response, conf_level, choice_reason)
+
+write.csv(lineup_model_data, here("analyses/01-lineups/lineup-model-data.csv"), row.names = F, na = "")
 ```
 
-There are `r length(unique(lineup_model_data$prolific_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
+```{r, eval = T}
+lineup_model_data <- read.csv(here("analyses/01-lineups/lineup-model-data.csv"))
+```
+
+There are `r length(unique(lineup_model_data$participant_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
 
 ```{r}
 lineup_model_data %>%
-  select(prolific_id, age, gender, academic_study, set, curvature, scale, correct, response_no, response, conf_level) %>%
+  select(participant_id, age, gender, academic_study, dataset_id, curvature, scale, correct, response_no, binary_response, conf_level) %>%
   head() %>%
   knitr::kable()
 ```
 
 # Check Randomization
 
-```{r}
+```{r, eval = T}
 lineup_model_data %>%
-  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  group_by(participant_id, n_lineups, curvature, scale) %>%
   summarize(n = n()) %>%
-  filter(scale == "linear") %>% #, study_starttime > 1646860792.49417) %>%
-  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+  filter(scale == "linear") %>%
+  pivot_wider(id_cols = c("participant_id", "n_lineups"),
               names_from = "curvature",
               values_from = "n") %>%
-  arrange(study_starttime) %>%
+  arrange(-n_lineups) %>%
   knitr::kable(caption = "Linear Scale")
-```
 
-```{r}
 lineup_model_data %>%
-  group_by(prolific_id, study_starttime, curvature, scale) %>%
+  group_by(participant_id, n_lineups, curvature, scale) %>%
   summarize(n = n()) %>%
-  filter(scale == "log") %>% #, study_starttime > 1646860792.49417) %>%
-  pivot_wider(id_cols = c("prolific_id", "study_starttime"),
+  filter(scale == "log") %>%
+  pivot_wider(id_cols = c("participant_id", "n_lineups"),
               names_from = "curvature",
               values_from = "n") %>%
-  arrange(study_starttime) %>%
+  arrange(-n_lineups) %>%
   knitr::kable(caption = "Log Scale")
 ```
 
@@ -124,7 +168,7 @@ The binary response was analyzed using a generalized linear mixed model followin
 \noindent We assume that random effects for data set and participant are independent.
 
 ```{r}
-glmm_mod <- glmer(response ~ curvature*scale + 
+glmm_mod <- glmer(binary_response ~ curvature*scale + 
                             (1 | participant_id) +
                             (1 | dataset_id),
                   data = lineup_model_data,

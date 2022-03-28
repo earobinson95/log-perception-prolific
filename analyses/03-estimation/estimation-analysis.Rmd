@@ -2,8 +2,23 @@
 title: "Estimation (Numeric Translation)"
 author: "Emily Robinson"
 date: "Spring 2022"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: lumen
 ---
+
+```{css, echo=FALSE}
+.center {
+  display: table;
+  margin-right: auto;
+  margin-left: auto;
+}
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -12,12 +27,18 @@ knitr::opts_chunk$set(
 	warning = FALSE,
 	cache = TRUE,
 	fig.align = 'center',
-	fig.width = 9,
-	fig.height = 6
+	fig.width = 8,
+	fig.height = 4 #,
+	# options(knitr.kable.NA = '')#,
+	# options(knitr.table.format = "pandoc")
 )
 library(tidyverse)
 library(plotly)
 library(digest)
+library(rstatix)
+library(ggpubr)
+library(ggforce)
+library(patchwork)
 
 library(RSQLite)
 library(DBI)
@@ -27,22 +48,94 @@ library(readr)
 library(lme4)
 library(emmeans)
 library(tictoc)
+
+library(ggwordcloud)
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+library(tm) 
+
+library(knitr)
 ```
 
 # Data
 
-```{r}
+```{r, eval = F}
 # user data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
-users <- dbReadTable(db_con,"users")
-completed_sections <- dbReadTable(db_con,"completed_sections")
+
+users <- dbReadTable(db_con,"users")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
+completed_sections_orig <- dbReadTable(db_con,"completed_sections")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
 dbDisconnect(db_con)
+
+completed_sections_all <- completed_sections_orig %>%
+  pivot_wider(id_cols = c("nick_name", "ip_address", "study_starttime"),
+              names_from = "section_complete",
+              values_from = time)
+
+demographic_data <- full_join(users, completed_sections_all, by = c("nick_name", "ip_address", "study_starttime"))  %>%
+  rename(you_draw_it = `you-draw-it`) %>%
+  mutate(lineups = ifelse(is.null(lineups), NA, lineups),
+         you_draw_it = ifelse(is.null(you_draw_it), NA, you_draw_it),
+         estimation = ifelse(is.null(estimation), NA, estimation)) %>%
+  mutate(studies_complete = as.numeric(!is.na(lineups)) + as.numeric(!is.na(you_draw_it)) + as.numeric(!is.na(estimation))) %>%
+  arrange(-studies_complete)
+
+all_participants <- demographic_data %>% filter(studies_complete == 3, recruitment != "I am the researcher")
 
 # estimation data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
-# dbListTables(db_con)
-estimation_feedback <- dbReadTable(db_con,"feedback")
-estimation_calcfeedback <- dbReadTable(db_con,"calc_feedback")
+
+estimation_feedback <- dbReadTable(db_con,"feedback")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+
+estimation_calcfeedback <- dbReadTable(db_con,"calc_feedback")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5")) %>%
+  mutate(calculation = paste(expression, "=", round(evaluated, 2), sep = "")) %>%
+  group_by(participant_id, q_id, creature, dataset, scale) %>%
+  summarise(calculation = paste(calculation, collapse = '; '))
+
+estimation_questions <- dbReadTable(db_con,"estimation_questions") %>%
+  mutate(true_value = ifelse(q_id == "QI3", as.numeric(true_value), true_value))
+estimation_scenario_text <- dbReadTable(db_con,"scenario_text_data")
+estimation_simulated_data <- dbReadTable(db_con,"simulated_data")
+estimation_parameters <- dbReadTable(db_con,"true_parameters")
+
+dbDisconnect(db_con)
+
+# combine estimation and user data
+joinCols <- c("participant_id", "nick_name", "ip_address", "study_starttime", "prolific_id")
+
+# feedback data
+estimation_model_data <- full_join(all_participants, estimation_feedback, by = joinCols) %>%
+  left_join(estimation_questions, by = c("q_id", "creature")) %>%
+  mutate(response = ifelse(q_id == "QE2" & creature == "tribble", as.character(as.numeric(response) - 4500), response),
+         true_value = ifelse(q_id == "QE2" & creature == "tribble", as.numeric(true_value) - 4500, true_value)) %>%
+  mutate(deviation = as.numeric(response) - true_value,
+         abs_deviation = abs(deviation)) %>%
+  full_join(estimation_calcfeedback, by = c("participant_id", "q_id", "creature", "dataset", "scale")) %>%
+  mutate(scratchpad = ifelse((scratchpad == "Put scratch-work here..." | is.na(scratchpad)), "", scratchpad),
+         calculation = ifelse(is.na(calculation), "", calculation)) %>%
+  select(participant_id, age, gender, academic_study, computer_mouse, recruitment, order, q_id, creature, dataset, scale, response, true_value, deviation, abs_deviation, calculation, scratchpad, qtext)
+
+factorCols <- c("participant_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "q_id", "creature", "dataset", "scale")
+estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
+
+write.csv(estimation_model_data, file = here("analyses/03-estimation/estimation-model-data.csv"), row.names = F, na = "")
+```
+
+```{r}
+
+# estimation data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
 estimation_questions <- dbReadTable(db_con,"estimation_questions") %>%
   mutate(true_value = ifelse(q_id == "QI3", as.numeric(true_value), true_value))
 estimation_scenario_text <- dbReadTable(db_con,"scenario_text_data")
@@ -50,79 +143,30 @@ estimation_simulated_data <- dbReadTable(db_con,"simulated_data")
 estimation_parameters <- dbReadTable(db_con,"true_parameters")
 dbDisconnect(db_con)
 
-# combine estimation and user data
-joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
-
-# feedback data
-estimation_model_data <- right_join(users, estimation_feedback, by = joinCols) %>%
-  left_join(estimation_questions, by = c("q_id", "creature")) %>%
-  filter(recruitment != "I am the researcher") %>%
-  mutate(response = ifelse(q_id == "QE2" & creature == "tribble", as.numeric(response) - 4500, response),
-         true_value = ifelse(q_id == "QE2" & creature == "tribble", as.numeric(true_value) - 4500, true_value))
-
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "q_id", "creature", "dataset", "scale")
-estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
-
-write.csv(estimation_model_data, file = here("analyses/03-estimation/data/estimation-model-data.csv"), row.names = F, na = "")
 # read in estimation_model_data
-# estimation_model_data     <- read.csv(here("analyses/03-estimation/data/estimation-model-data.csv"))
+estimation_model_data     <- read.csv(here("analyses/03-estimation/estimation-model-data.csv"))
 
 estimation_model_data %>%
-  select(prolific_id, q_id, creature, dataset, scale, response, qtext, true_value) %>%
+  select(participant_id, q_id, creature, dataset, scale, response, qtext, true_value) %>%
   head() %>%
   knitr::kable(digits = 2)
 ```
 
-## Visuals
+```{r, eval = T}
 
-```{r visuals, eval = F, fig.width = 9, fig.height = 9}
+estimationPlots <- function(qID){
 
-estimation_questions %>% knitr::kable()
-
-estimation_model_data %>%
-  filter(q_id != "Q0", prolific_id != 186230) %>%
-  ggplot(aes(x = scale, y = as.numeric(response))) +
-  geom_jitter(width = 0.2) +
+estimation_plot <- estimation_model_data %>%
+  # filter(q_id == "QE1") %>%
+    filter(q_id == qID) %>%
+  mutate(response = as.numeric(response)) %>%
+  ggplot(aes(x = scale, y = response, group = participant_id, color = scale, label = paste(calculation, "\n", scratchpad))) +
+  geom_linerange(aes(ymin = true_value, ymax = response), position = position_dodge2(0.95), alpha = 0.8, size = 0.1) +
+  geom_point(position = position_dodge2(0.95), alpha = 0.8, size = 0.8, shape = 1) +
   geom_hline(aes(yintercept = true_value), linetype = "dashed") +
   facet_wrap(~q_id, scales = "free") +
   theme_bw() +
-  theme(aspect.ratio = 1)
-```
-
-
-```{r, eval = T, fig.height = 80, fig.width = 12}
-
-estimationPlots <- function(qID){
-  
-  label_data <- estimation_calcfeedback %>%
-  filter(q_id != "Q0", prolific_id != 186230) %>%
-  filter(q_id == qID) %>%
-  mutate(calculation = paste(expression, "=", round(evaluated, 2), sep = "")) %>%
-  group_by(nick_name, ip_address, prolific_id, study_starttime, q_id, creature, dataset, scale) %>%
-  summarise(calculation = paste(calculation, collapse = '; '))
-
-estimation_plot_data <- estimation_model_data %>%
-  filter(q_id != "Q0", prolific_id != 186230) %>%
-  filter(q_id == qID) %>%
-  left_join(label_data, by = c("nick_name", "ip_address", "prolific_id", "study_starttime", "q_id", "creature", "dataset", "scale")) %>%
-  mutate(scratchpad = ifelse(scratchpad == "Put scratch-work here...", NA, paste(";", scratchpad))) %>%
-  mutate_all(~str_replace_na(., "")) %>%
-  mutate(label = paste(calculation, scratchpad))
-
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "order", "q_id", "creature", "dataset", "scale")
-estimation_plot_data[,factorCols] <- lapply(estimation_plot_data[,factorCols], factor)
-numericCols <- c("response", "true_value")
-estimation_plot_data[,numericCols] <- lapply(estimation_plot_data[,numericCols], as.numeric)
-
-summary(estimation_plot_data)
-
-estimation_plot <- estimation_plot_data %>%
-  ggplot(aes(x = response, y = prolific_id, color = scale, label = label)) +
-  geom_linerange(aes(xmin = true_value, xmax = response), position = position_dodge2(0.5)) +
-  geom_point(position = position_dodge2(0.5)) +
-  geom_vline(aes(xintercept = true_value), linetype = "dashed") +
-  facet_wrap(~q_id, scales = "free") +
-  theme_bw() +
+  theme(axis.text.x = element_blank()) +
   # theme(aspect.ratio = 1) +
   # ggtitle(paste(estimation_questions$qtext[estimation_questions$q_id == qID][1], "\n ", estimation_questions$qtext[estimation_questions$q_id == qID][2])) +
   scale_color_manual(values = c("steelblue", "orange"))
@@ -130,27 +174,701 @@ estimation_plot <- estimation_plot_data %>%
 return(estimation_plot)  
 
 }
+```
 
+```{r, eval = F}
+simulated_linear_plot <- estimation_simulated_data %>%
+  ggplot(aes(x = (x-3000), y = y)) +
+  geom_point() +
+  geom_line(aes(y = y0), size = 0.5, color = "gray30", linetype = "dashed") +
+  facet_wrap(~dataset, scales = "free") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous(limits = c(100, 55000),
+                     breaks = seq(0, 55000, 5000),
+                     labels = scales::comma,
+                     minor_breaks = c())
+# ggsave(simulated_linear_plot, filename = here("analyses/03-estimation/simulated-plots/simulated-linear-plot.png"), width = 12, height = 6)
+
+simulated_log_plot <- estimation_simulated_data %>%
+  ggplot(aes(x = (x-3000), y = y)) +
+  geom_point() +
+  geom_line(aes(y = y0), size = 0.5, color = "gray30", linetype = "dashed") +
+  facet_wrap(~dataset, scales = "free") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous(trans = "log2",
+                     limits = c(100, 55000),
+                     breaks = 2^seq(0,10000,1),
+                     labels = scales::comma,
+                     minor_breaks = c())
+# ggsave(simulated_log_plot, filename = here("analyses/03-estimation/simulated-plots/simulated-log-plot.png"), width = 12, height = 6)
+```
+
+# Q0: Open Ended
+
+```{r}
 estimation_questions %>% filter(q_id == "Q0") %>% knitr::kable()
-estimation_model_data %>% filter(q_id == "Q0") %>% select(prolific_id, creature, scale, response) %>% knitr::kable()
+# estimation_model_data %>% filter(q_id == "Q0") %>% select(participant_id, creature, scale, response) %>% knitr::kable()
 
-estimation_questions %>% filter(q_id == "QE1") %>% knitr::kable()
+createWordcloud <- function(q0_data) {
+  
+  #Create a vector containing only the text
+  text <- q0_data[,"response"]
+  # Create a corpus  
+  docs <- Corpus(VectorSource(text))
+  
+  docs <- docs %>%
+    tm_map(removeNumbers) %>%
+    tm_map(removePunctuation) %>%
+    tm_map(stripWhitespace)
+  docs <- tm_map(docs, content_transformer(tolower))
+  docs <- tm_map(docs, removeWords, stopwords("english"))
+  
+  dtm <- TermDocumentMatrix(docs) 
+  matrix <- as.matrix(dtm) 
+  words <- sort(rowSums(matrix),decreasing=TRUE) 
+  df <- data.frame(word = names(words),freq=words)
+  
+  set.seed(1234) # for reproducibility 
+  wordcloud_plot <- wordcloud(words = df$word, 
+                              freq = df$freq, 
+                              min.freq = 1, 
+                              max.words=200, 
+                              random.order=FALSE, 
+                              rot.per=0.35, 
+                              colors=brewer.pal(8, "Dark2")
+                              )
+  
+  return(wordcloud_plot)
+
+}
+```
+
+## Linear Scale
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot.png"))
+```
+
+```{r}
+q0linear_data <- estimation_model_data %>% 
+  filter(q_id == "Q0", scale == "linear")
+createWordcloud(q0linear_data)
+```
+
+## Log Scale
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot.png"))
+```
+
+```{r}
+q0log_data <- estimation_model_data %>% 
+  filter(q_id == "Q0", scale == "log2")
+createWordcloud(q0log_data)
+```
+
+# QE1: Estimate a population given a year
+
+## Question
+```{r}
+estimation_questions %>% filter(q_id == "QE1") %>% knitr::kable(digits = 2)
+```
+
+## Closest Points
+
+```{r}
+estimation_simulated_data %>% 
+  filter(x == 3010) %>%
+  knitr::kable(digits = 2)
+```
+
+## Exploration
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE1.png"))
+```
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE1.png"))
+```
+
+<div class = 'center'>
+```{r}
 estimation_plotQE1 <- estimationPlots("QE1")
 ggplotly(estimation_plotQE1)
+```
+</div>
 
-estimation_questions %>% filter(q_id == "QE2") %>% knitr::kable()
+## Data
+
+```{r}
+qe1_data <- estimation_model_data %>% 
+  filter(q_id == "QE1") %>%
+  mutate(response = as.numeric(response),
+         closest_pt_value = ifelse(dataset == "dataset1", 445.4833, 466.8964),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation)
+
+qe1_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QE1 data set example")
+```
+
+## Common Responses
+
+```{r}
+qe1_common_responses <- qe1_data %>%
+  group_by(scale, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 5) %>%
+  arrange(scale, -count)
+
+qe1_common_plot_linear <- qe1_common_responses %>%
+  filter(scale == "linear") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qe1_common_plot_log <- qe1_common_responses %>%
+  filter(scale == "log2") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qe1_common_plot_linear + qe1_common_plot_log
+```
+
+## Wilcox 
+
+### True value absolute deviation
+
+```{r}
+qe1_data %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe1_data %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,1500)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qe1_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe1_data)
+qe1_kwMod
+qe1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe1_data)
+qe1_wilcoxMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qe1_data %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe1_data %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,1500)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
+qe1_kwMod
+qe1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
+qe1_wilcoxMod
+```
+
+# QE2: Estimate a year given a population
+
+## Question
+```{r}
+estimation_questions %>% filter(q_id == "QE2") %>% knitr::kable(digits = 2)
+```
+
+## Closest Points
+
+```{r}
+estimation_simulated_data %>% 
+  filter(abs(y - 4000) < 1500) %>%
+  mutate(x = x - 3000) %>%
+  arrange(dataset, y)  %>% 
+  knitr::kable(digits = 2)
+```
+
+## Exploration
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE2.png"))
+```
+
+<div class = 'center'>
+```{r}
 estimation_plotQE2 <- estimationPlots("QE2")
 ggplotly(estimation_plotQE2)
+```
+</div>
 
+## Data
+```{r}
+qe2_data <- estimation_model_data %>% 
+  filter(q_id == "QE2") %>%
+  mutate(response = as.numeric(response),
+         closest_pt_value = ifelse(dataset == "dataset1", 24, 27),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation)
+
+qe2_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QE2 data set example")
+```
+
+## Common Responses
+```{r}
+qe2_common_responses <- qe2_data %>%
+  group_by(scale, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 5) %>%
+  arrange(scale, -count)
+
+qe2_common_plot_linear <- qe2_common_responses %>%
+  filter(scale == "linear") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qe2_common_plot_log <- qe2_common_responses %>%
+  filter(scale == "log2") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qe2_common_plot_linear + qe2_common_plot_log
+```
+
+## Wilcox 
+
+### True value absolute deviaiton
+
+```{r}
+qe2_data %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe2_data %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,10)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qe2_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe2_data)
+qe2_kwMod
+qe2_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe2_data)
+qe2_wilcoxMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qe2_data %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe2_data %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,10)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qe2_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe2_data)
+qe2_kwMod
+qe2_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe2_data)
+qe2_wilcoxMod
+```
+
+# QI1: Estimate an additive increase in population between two years
+
+```{r}
 estimation_questions %>% filter(q_id == "QI1") %>% knitr::kable()
+```
+
+## Closest Points
+
+```{r}
+estimation_simulated_data %>% 
+  filter(x %in% c(3020, 3040)) %>%
+  arrange(dataset) %>%
+  pivot_wider(id_cols = c("dataset"),
+              names_from = "x",
+              values_from = "y") %>%
+  mutate(increase = `3040` - `3020`) %>%
+  knitr::kable(digits = 2)
+```
+
+
+## Exploration
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI1.png"))
+```
+
+<div class = 'center'>
+```{r}
 estimation_plotQI1 <- estimationPlots("QI1")
 ggplotly(estimation_plotQI1)
+```
+</div>
 
+## Data
+```{r}
+qi1_data <- estimation_model_data %>% 
+  filter(q_id == "QI1") %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 15517.75, 22897.43),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation)
+
+qi1_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI1 data set example")
+```
+
+## Common Responses
+```{r}
+qi1_common_responses <- qi1_data %>%
+  group_by(scale, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 5) %>%
+  arrange(scale, -count)
+
+qi1_common_plot_linear <- qi1_common_responses %>%
+  filter(scale == "linear") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi1_common_plot_log <- qi1_common_responses %>%
+  filter(scale == "log2") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi1_common_plot_linear + qi1_common_plot_log
+```
+
+```{r}
+qi1_data %>%
+  # filter(response < 40000, response > 5000) %>%
+  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(5000,30000)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  ggtitle("Raw Responses")
+```
+
+## Wilcox 
+
+### True value absolute deviaiton
+
+```{r}
+qi1_data %>% 
+  # filter(response < 40000, response > 5000) %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi1_data %>%
+  # filter(response < 40000, response > 5000) %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,20000)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi1_kwMod <- kruskal.test(abs_deviation ~ scale, 
+                          data = qi1_data
+                          # data = qi1_data %>% filter(response < 40000, response > 5000)
+                          )
+qi1_kwMod
+qi1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
+                          data = qi1_data
+                          # data = qi1_data %>% filter(response < 40000, response > 5000)
+                          )
+qi1_wilcoxMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qi1_data %>% 
+  # filter(response < 40000, response > 5000) %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi1_data %>%
+  # filter(response < 40000, response > 5000) %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,20000)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi1_data
+                          # data = qi1_data %>% filter(response < 40000, response > 5000)
+                          )
+qi1_kwMod
+qi1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi1_data
+                          # data = qi1_data %>% filter(response < 40000, response > 5000)
+                          )
+qi1_wilcoxMod
+```
+
+# QI2: Estimate a multiplicative change in population between two years (i.e. how many times larger)
+
+```{r}
 estimation_questions %>% filter(q_id == "QI2") %>% knitr::kable()
+```
+
+## Closest Points
+
+```{r}
+estimation_simulated_data %>% 
+  filter(x %in% c(3020, 3040)) %>%
+  arrange(dataset) %>%
+  pivot_wider(id_cols = c("dataset"),
+              names_from = "x",
+              values_from = "y") %>%
+  mutate(increase = `3040`/`3020`) %>%
+  knitr::kable(digits = 2)
+```
+
+
+## Exploration
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI2.png"))
+```
+
+<div class = 'center'>
+```{r}
 estimation_plotQI2 <- estimationPlots("QI2")
 ggplotly(estimation_plotQI2)
+```
+</div>
 
+## Data
+```{r}
+qi2_data <- estimation_model_data %>% 
+  filter(q_id == "QI2") %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 11.15, 18.76),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation)
+
+qi2_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI2 data set example")
+```
+
+## Common Responses
+```{r}
+qi2_common_responses <- qi2_data %>%
+  group_by(scale, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 5) %>%
+  arrange(scale, -count)
+
+qi2_common_plot_linear <- qi2_common_responses %>%
+  filter(scale == "linear") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi2_common_plot_log <- qi2_common_responses %>%
+  filter(scale == "log2") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi2_common_plot_linear + qi2_common_plot_log
+
+# Define the number of colors you want
+# nb.cols <- unique(qi2_common_responses$count) %>% length()
+# mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
+# 
+# set.seed(68505)
+# qi2_common_responses %>%
+#   ggplot(aes(label = round(response,2), size = count, color = as.factor(count))) +
+#   geom_text_wordcloud() +
+#   scale_size_area(max_size = 20) +
+#   facet_grid(~scale) +
+#   theme_test() +
+#   scale_color_manual(values = mycolors)
+```
+
+```{r}
+qi2_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0, 25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  ggtitle("Raw Responses")
+```
+
+## Wilcox 
+
+### True value absolute deviaiton
+
+```{r}
+qi2_data %>% 
+  # filter(response < 25) %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi2_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi2_kwMod <- kruskal.test(abs_deviation ~ scale, 
+                          data = qi2_data
+                          # data = qi2_data %>% filter(response < 25)
+                          )
+qi2_kwMod
+qi2_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
+                          data = qi2_data
+                          # data = qi2_data %>% filter(response < 40000, response > 5000)
+                          )
+qi2_wilcoxMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qi2_data %>% 
+  # filter(response < 25) %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi2_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi2_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi2_data
+                          # data = qi2_data %>% filter(response < 40000, response > 5000)
+                          )
+qi2_kwMod
+qi2_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi2_data
+                          # data = qi2_data %>% filter(response < 40000, response > 5000)
+                          )
+qi2_wilcoxMod
+```
+
+# QI3: Estimate the number of years necessary to double the population
+
+```{r}
 estimation_questions %>% filter(q_id == "QI3") %>% knitr::kable()
+```
+
+<div class = 'center'>
+```{r}
 estimation_plotQI3 <- estimationPlots("QI3")
 ggplotly(estimation_plotQI3)
 ```
+</div>
