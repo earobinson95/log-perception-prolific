@@ -133,7 +133,6 @@ write.csv(estimation_model_data, file = here("analyses/03-estimation/estimation-
 ```
 
 ```{r}
-
 # estimation data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/03_estimation_db.db"))
 estimation_questions <- dbReadTable(db_con,"estimation_questions") %>%
@@ -288,10 +287,7 @@ estimation_simulated_data %>%
 
 ```{r, out.width = "80%"}
 knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE1.png"))
-```
-
-```{r, out.width = "80%"}
-knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE1.png"))
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot-QE1.png"))
 ```
 
 <div class = 'center'>
@@ -421,6 +417,7 @@ estimation_simulated_data %>%
 
 ```{r, out.width = "80%"}
 knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QE2.png"))
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot-QE2.png"))
 ```
 
 <div class = 'center'>
@@ -551,6 +548,7 @@ estimation_simulated_data %>%
 
 ```{r, out.width = "80%"}
 knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI1.png"))
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot-QI1.png"))
 ```
 
 <div class = 'center'>
@@ -711,6 +709,7 @@ estimation_simulated_data %>%
 
 ```{r, out.width = "80%"}
 knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI2.png"))
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot-QI2.png"))
 ```
 
 <div class = 'center'>
@@ -866,9 +865,181 @@ qi2_wilcoxMod
 estimation_questions %>% filter(q_id == "QI3") %>% knitr::kable()
 ```
 
+## Closest Points
+
+From QE1, the estimated population at 10 is:
+
+```{r}
+doubled_data <- estimation_simulated_data %>% 
+  filter(x == 3010) %>%
+  mutate(doubled = y*2)
+
+doubled_data %>%
+  knitr::kable(digits = 2)
+```
+
+```{r}
+estimation_simulated_data %>% 
+  left_join(doubled_data %>% select(-c(x, y0, y)), by = c("dataset")) %>%
+  mutate(pop_diff = abs(y - doubled),
+         year_diff = x - 3010) %>%
+  filter(pop_diff < 200) %>%
+  arrange(dataset, pop_diff) %>%
+  knitr::kable(digits = 2)
+```
+
+
+## Exploration
+
+```{r, out.width = "80%"}
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI3.png"))
+knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-log-plot-QI3.png"))
+```
+
 <div class = 'center'>
 ```{r}
 estimation_plotQI3 <- estimationPlots("QI3")
 ggplotly(estimation_plotQI3)
 ```
 </div>
+
+## Data
+```{r}
+qi3_data <- estimation_model_data %>% 
+  filter(q_id == "QI3") %>%
+  # filter(response < 100) %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 4, 6),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation)
+
+qi3_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI3 data set example")
+```
+
+## Common Responses
+```{r}
+qi3_common_responses <- qi3_data %>%
+  group_by(scale, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 5) %>%
+  arrange(scale, -count)
+
+qi3_common_plot_linear <- qi3_common_responses %>%
+  filter(scale == "linear") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi3_common_plot_log <- qi3_common_responses %>%
+  filter(scale == "log2") %>%
+  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
+  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
+  geom_point() +
+  facet_grid(~scale) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_y_discrete("Response")
+
+qi3_common_plot_linear + qi3_common_plot_log
+
+# Define the number of colors you want
+# nb.cols <- unique(qi3_common_responses$count) %>% length()
+# mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
+# 
+# set.seed(68505)
+# qi3_common_responses %>%
+#   ggplot(aes(label = round(response,2), size = count, color = as.factor(count))) +
+#   geom_text_wordcloud() +
+#   scale_size_area(max_size = 20) +
+#   facet_grid(~scale) +
+#   theme_test() +
+#   scale_color_manual(values = mycolors)
+```
+
+```{r}
+qi3_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0, 25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  ggtitle("Raw Responses")
+```
+
+## Wilcox 
+
+### True value absolute deviaiton
+
+```{r}
+qi3_data %>% 
+  # filter(response < 25) %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi3_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi3_kwMod <- kruskal.test(abs_deviation ~ scale, 
+                          data = qi3_data
+                          # data = qi3_data %>% filter(response < 25)
+                          )
+qi3_kwMod
+qi3_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
+                          data = qi3_data
+                          # data = qi3_data %>% filter(response < 40000, response > 5000)
+                          )
+qi3_wilcoxMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qi3_data %>% 
+  # filter(response < 25) %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi3_data %>%
+  # filter(response < 25) %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,25)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+  
+qi3_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi3_data
+                          # data = qi3_data %>% filter(response < 40000, response > 5000)
+                          )
+qi3_kwMod
+qi3_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
+                          data = qi3_data
+                          # data = qi3_data %>% filter(response < 40000, response > 5000)
+                          )
+qi3_wilcoxMod
+```
