@@ -124,7 +124,11 @@ estimation_model_data <- full_join(all_participants, estimation_feedback, by = j
   full_join(estimation_calcfeedback, by = c("participant_id", "q_id", "creature", "dataset", "scale")) %>%
   mutate(scratchpad = ifelse((scratchpad == "Put scratch-work here..." | is.na(scratchpad)), "", scratchpad),
          calculation = ifelse(is.na(calculation), "", calculation)) %>%
-  select(participant_id, age, gender, academic_study, computer_mouse, recruitment, order, q_id, creature, dataset, scale, response, true_value, deviation, abs_deviation, calculation, scratchpad, qtext)
+  group_by(participant_id) %>%
+  mutate(NQs = n(), .after = participant_id) %>%
+  ungroup() %>%
+  filter(NQs == 12) %>%
+  select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, creature, dataset, scale, response, true_value, deviation, abs_deviation, calculation, scratchpad, qtext)
 
 factorCols <- c("participant_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "q_id", "creature", "dataset", "scale")
 estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
@@ -144,11 +148,31 @@ dbDisconnect(db_con)
 
 # read in estimation_model_data
 estimation_model_data     <- read.csv(here("analyses/03-estimation/estimation-model-data.csv"))
+```
 
+A total of `r unique(estimation_model_data$participant_id) %>% length()` participants each completed all 12 estimation questions for a total of `r (unique(estimation_model_data$participant_id) %>% length())*12` estimations.
+
+```{r}
 estimation_model_data %>%
   select(participant_id, q_id, creature, dataset, scale, response, qtext, true_value) %>%
   head() %>%
   knitr::kable(digits = 2)
+```
+
+# Check Randomization
+
+```{r}
+estimation_model_data %>%
+  group_by(participant_id) %>%
+  mutate(N = n()) %>%
+  group_by(participant_id, N, q_id, scale) %>%
+  summarize(count = n()) %>%
+  mutate(ID = paste(q_id, scale, sep = "-")) %>%
+  pivot_wider(id_cols = c("participant_id", "N"),
+              names_from = "ID",
+              values_from = count) %>%
+  arrange(N) %>%
+  knitr::kable()
 ```
 
 ```{r, eval = T}
@@ -346,55 +370,59 @@ qe1_common_plot_log <- qe1_common_responses %>%
 qe1_common_plot_linear + qe1_common_plot_log
 ```
 
-## Wilcox 
+## Main Take Aways
 
-### True value absolute deviation
+### More varability in the estimation made on the linear scale
 
-```{r}
-qe1_data %>%
-  group_by(scale) %>%
-  get_summary_stats(abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+<!-- ## Wilcox  -->
 
-qe1_data %>%
-  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,1500)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qe1_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe1_data)
-qe1_kwMod
-qe1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe1_data)
-qe1_wilcoxMod
-```
+<!-- ### True value absolute deviation -->
 
-### Closest point absolute deviation
+<!-- ```{r} -->
+<!-- qe1_data %>% -->
+<!--   group_by(scale) %>% -->
+<!--   get_summary_stats(abs_deviation, type = "median_iqr") %>% -->
+<!--   knitr::kable(digits = 2) -->
 
-```{r}
-qe1_data %>%
-  group_by(scale) %>%
-  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+<!-- qe1_data %>% -->
+<!--   ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) + -->
+<!--   geom_jitter(alpha = 0.05) + -->
+<!--   geom_boxplot(alpha = 0.3, width = 0.2) + -->
+<!--   theme_bw() + -->
+<!--   theme(aspect.ratio = 1) + -->
+<!--   facet_zoom(ylim = c(0,1500)) + -->
+<!--   scale_color_manual(values = c("steelblue", "orange3")) + -->
+<!--   scale_fill_manual(values = c("steelblue", "orange3")) -->
 
-qe1_data %>%
-  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,1500)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
-qe1_kwMod
-qe1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
-qe1_wilcoxMod
-```
+<!-- qe1_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe1_data) -->
+<!-- qe1_kwMod -->
+<!-- qe1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe1_data) -->
+<!-- qe1_wilcoxMod -->
+<!-- ``` -->
+
+<!-- ### Closest point absolute deviation -->
+
+<!-- ```{r} -->
+<!-- qe1_data %>% -->
+<!--   group_by(scale) %>% -->
+<!--   get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>% -->
+<!--   knitr::kable(digits = 2) -->
+
+<!-- qe1_data %>% -->
+<!--   ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) + -->
+<!--   geom_jitter(alpha = 0.05) + -->
+<!--   geom_boxplot(alpha = 0.3, width = 0.2) + -->
+<!--   theme_bw() + -->
+<!--   theme(aspect.ratio = 1) + -->
+<!--   facet_zoom(ylim = c(0,1500)) + -->
+<!--   scale_color_manual(values = c("steelblue", "orange3")) + -->
+<!--   scale_fill_manual(values = c("steelblue", "orange3")) -->
+
+<!-- qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data) -->
+<!-- qe1_kwMod -->
+<!-- qe1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe1_data) -->
+<!-- qe1_wilcoxMod -->
+<!-- ``` -->
 
 # QE2: Estimate a year given a population
 
