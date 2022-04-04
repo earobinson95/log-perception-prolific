@@ -188,8 +188,9 @@ glmm_mod <- glmer(binary_response ~ curvature*scale +
                   family = binomial(link = "logit"))
 
 lineup_anova <- car::Anova(glmm_mod) %>% broom::tidy()
+summary(glmm_mod)
 
-write.csv(lineup_anova, here("analyses/01-lineups/results/lineups-anova.csv"), row.names = F, na =)
+# write.csv(lineup_anova, here("analyses/01-lineups/results/lineups-anova.csv"), row.names = F, na =)
 
 lineup_anova %>% knitr::kable(digits = 3, caption = "Lineups GLMM ANOVA")
 ```

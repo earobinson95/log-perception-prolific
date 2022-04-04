@@ -1702,6 +1702,70 @@ specific characteristics.</li>
 </ul>
 <p>We assume that random effects for data set and participant are
 independent.</p>
+<pre><code>## Generalized linear mixed model fit by maximum likelihood (Laplace
+##   Approximation) [glmerMod]
+##  Family: binomial  ( logit )
+## Formula: binary_response ~ curvature * scale + (1 | participant_id) +  
+##     (1 | dataset_id)
+##    Data: lineup_model_data
+## 
+##      AIC      BIC   logLik deviance df.resid 
+##   3705.9   3793.9  -1839.0   3677.9     3944 
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -5.7555 -0.4750  0.1915  0.5062 10.1682 
+## 
+## Random effects:
+##  Groups         Name        Variance Std.Dev.
+##  participant_id (Intercept) 1.193    1.092   
+##  dataset_id     (Intercept) 0.433    0.658   
+## Number of obs: 3958, groups:  participant_id, 311; dataset_id, 12
+## 
+## Fixed effects:
+##                           Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)                 2.8571     0.5206   5.489 4.05e-08 ***
+## curvaturet-E_n-M           -3.2995     0.7114  -4.638 3.52e-06 ***
+## curvaturet-H_n-E           -2.5065     0.7069  -3.546 0.000392 ***
+## curvaturet-H_n-M           -4.8317     0.7182  -6.727 1.73e-11 ***
+## curvaturet-M_n-E           -6.6936     0.7622  -8.782  &lt; 2e-16 ***
+## curvaturet-M_n-H           -1.2935     0.7108  -1.820 0.068794 .  
+## scalelog                   -0.3333     0.2965  -1.124 0.261052    
+## curvaturet-E_n-M:scalelog   2.8893     0.3884   7.440 1.01e-13 ***
+## curvaturet-H_n-E:scalelog   1.7467     0.3638   4.801 1.58e-06 ***
+## curvaturet-H_n-M:scalelog   2.1571     0.3640   5.926 3.11e-09 ***
+## curvaturet-M_n-E:scalelog   4.2127     0.4449   9.469  &lt; 2e-16 ***
+## curvaturet-M_n-H:scalelog  -1.2457     0.3603  -3.457 0.000546 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) cr-E_-M cr-H_-E cr-H_-M cr-M_-E cr-M_-H scallg c-E_-M:
+## crvtrt-E_-M -0.722                                                       
+## crvtrt-H_-E -0.725  0.531                                                
+## crvtrt-H_-M -0.718  0.527   0.528                                        
+## crvtrt-M_-E -0.679  0.497   0.498   0.497                                
+## crvtrt-M_-H -0.718  0.526   0.529   0.522   0.491                        
+## scalelog    -0.316  0.231   0.232   0.230   0.216   0.230                
+## crvtr-E_-M:  0.251 -0.271  -0.183  -0.188  -0.178  -0.179  -0.763        
+## crvtr-H_-E:  0.262 -0.192  -0.257  -0.193  -0.183  -0.189  -0.815  0.628 
+## crvtr-H_-M:  0.264 -0.194  -0.193  -0.305  -0.187  -0.189  -0.817  0.634 
+## crvtr-M_-E:  0.220 -0.162  -0.159  -0.165  -0.426  -0.155  -0.668  0.523 
+## crvtr-M_-H:  0.252 -0.184  -0.187  -0.181  -0.168  -0.280  -0.822  0.619 
+##             c-H_-E: c-H_-M: c-M_-E:
+## crvtrt-E_-M                        
+## crvtrt-H_-E                        
+## crvtrt-H_-M                        
+## crvtrt-M_-E                        
+## crvtrt-M_-H                        
+## scalelog                           
+## crvtr-E_-M:                        
+## crvtr-H_-E:                        
+## crvtr-H_-M:  0.670                 
+## crvtr-M_-E:  0.549   0.556         
+## crvtr-M_-H:  0.665   0.664   0.540 
+## optimizer (Nelder_Mead) convergence code: 0 (OK)
+## Model failed to converge with max|grad| = 0.0536203 (tol = 0.002, component 1)</code></pre>
 <table>
 <caption>Lineups GLMM ANOVA</caption>
 <thead>
@@ -1715,19 +1779,19 @@ independent.</p>
 <tbody>
 <tr class="odd">
 <td align="left">curvature</td>
-<td align="right">30.257</td>
+<td align="right">32.230</td>
 <td align="right">5</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="left">scale</td>
-<td align="right">96.144</td>
+<td align="right">96.664</td>
 <td align="right">1</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="left">curvature:scale</td>
-<td align="right">294.658</td>
+<td align="right">294.443</td>
 <td align="right">5</td>
 <td align="right">0</td>
 </tr>
