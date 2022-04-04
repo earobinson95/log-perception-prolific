@@ -75,7 +75,7 @@ db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical
 
 lineups_feedback <- dbReadTable(db_con,"feedback")  %>%
   rowwise() %>%
-  mutate(participant_id = digest(prolific_id, sep = "-"), "md5"))
+  mutate(participant_id = digest(prolific_id, "md5"))
 
 picture_details <- dbReadTable(db_con,"picture_details")
 
@@ -110,10 +110,14 @@ write.csv(lineup_model_data, here("analyses/01-lineups/lineup-model-data.csv"), 
 ```
 
 ```{r, eval = T}
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/01_lineups_db.db"))
+lineups_feedback <- dbReadTable(db_con,"feedback")  %>%
+  rowwise() %>%
+  mutate(participant_id = digest(prolific_id, "md5"))
+dbDisconnect(db_con)
+
 lineup_model_data <- read.csv(here("analyses/01-lineups/lineup-model-data.csv"))
 ```
-
-There are `r length(unique(lineup_model_data$participant_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete.
 
 ```{r}
 lineup_model_data %>%
@@ -122,9 +126,9 @@ lineup_model_data %>%
   knitr::kable()
 ```
 
-# Check Randomization
+<!-- # Check Randomization -->
 
-```{r, eval = T}
+```{r, eval = F}
 lineup_model_data %>%
   group_by(participant_id, n_lineups, curvature, scale) %>%
   summarize(n = n()) %>%
@@ -147,6 +151,15 @@ lineup_model_data %>%
 ```
 
 # Analysis
+
+```{r}
+ploteval_summary <- lineup_model_data %>% group_by(curvature, set, scale) %>% summarize(count = n()) %>% arrange(count)
+```
+
++ There are `r length(unique(lineups_feedback$participant_id)) %>% as.numeric` participants and `r nrow(lineups_feedback) %>% as.numeric()` lineups complete. 
++ There are `r length(unique(lineup_model_data$participant_id)) %>% as.numeric` participants and `r nrow(lineup_model_data) %>% as.numeric()` lineups complete. 
++ Each plot was evaluated between `r min(ploteval_summary$count) %>% as.numeric() %>% round(2)` and `r max(ploteval_summary$count)  %>% as.numeric()  %>% round(2)` times (Mean: `r mean(ploteval_summary$count)  %>% as.numeric()  %>% round(2)`, SD: `r sd(ploteval_summary$count)  %>% as.numeric()  %>% round(2)`).
++ Participants correctly identified the target panel in `r round(as.numeric(mean(lineup_model_data$binary_response[lineup_model_data$scale == 'linear']))*100, 2)`% of the `r nrow(lineup_model_data[lineup_model_data$scale == 'linear',]) %>% as.numeric()` lineup evaulations made on the linear scale and `r round(as.numeric(mean(lineup_model_data$binary_response[lineup_model_data$scale == 'log']))*100, 2)`% of the `r nrow(lineup_model_data[lineup_model_data$scale == 'log',]) %>% as.numeric()` lineup evaluations made on the log scale.
 
 Target plot identification was analyzed using the `glmer` function in the `lme4` R package. 
 Estimates and odds ratio comparisons between the log and linear scales were calculated using the `emmeans` R package.
