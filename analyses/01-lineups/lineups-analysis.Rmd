@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 	echo = FALSE,
 	message = FALSE,
 	warning = FALSE,
-	cache = FALSE
+	cache = TRUE
 )
 library(tidyverse)
 library(cowplot)
@@ -41,11 +41,11 @@ db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical
 
 users <- dbReadTable(db_con,"users") %>%
   rowwise() %>%
-  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+  mutate(participant_id = digest(prolific_id, "md5"))
 
 completed_sections_orig <- dbReadTable(db_con,"completed_sections") %>%
   rowwise() %>%
-  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+  mutate(participant_id = digest(prolific_id, "md5"))
 
 dbDisconnect(db_con)
 
@@ -75,7 +75,7 @@ db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical
 
 lineups_feedback <- dbReadTable(db_con,"feedback")  %>%
   rowwise() %>%
-  mutate(participant_id = digest(paste(prolific_id, study_starttime, sep = "-"), "md5"))
+  mutate(participant_id = digest(prolific_id, sep = "-"), "md5"))
 
 picture_details <- dbReadTable(db_con,"picture_details")
 
@@ -173,7 +173,12 @@ glmm_mod <- glmer(binary_response ~ curvature*scale +
                             (1 | dataset_id),
                   data = lineup_model_data,
                   family = binomial(link = "logit"))
-car::Anova(glmm_mod) %>% broom::tidy() %>% knitr::kable(digits = 3, caption = "Lineups GLMM ANOVA")
+
+lineup_anova <- car::Anova(glmm_mod) %>% broom::tidy()
+
+write.csv(lineup_anova, here("analyses/01-lineups/results/lineups-anova.csv"), row.names = F, na =)
+
+lineup_anova %>% knitr::kable(digits = 3, caption = "Lineups GLMM ANOVA")
 ```
 
 ```{r, eval = F, include = F, fig.align = 'center', fig.width = 12, fig.height = 6}
@@ -195,6 +200,7 @@ lineup_lsmeans %>%
 
 ```{r, fig.align = 'center', fig.width = 12, fig.height = 6}
 lineups_or <- emmeans(glmm_mod, ~ scale | curvature, type = "response") %>% pairs(reverse = T, infer = c(T,T)) %>% as_tibble()
+write.csv(lineups_or, here("analyses/01-lineups/results/lineups-odds-ratios.csv"), row.names = F, na =)
 
 dodge <- position_dodge(width=0.9)
 lineups_or_plot <- lineups_or %>%
@@ -218,9 +224,12 @@ lineups_or_plot <- lineups_or %>%
   scale_color_manual("Target Panel Difficulty", values = c("#004400", "#116611", "#55aa55")) + 
   scale_shape_discrete("Target Panel Difficulty")
 
-picsList <- c("images/tM_nH.png", "images/tE_nH.png", 
-              "images/tH_nM.png", "images/tE_nM.png", 
-              "images/tH_nE.png", "images/tM_nE.png"
+picsList <- c("images/tM_nH_thumbnail.png", 
+              "images/tE_nH_thumbnail.png", 
+              "images/tH_nM_thumbnail.png", 
+              "images/tE_nM_thumbnail.png", 
+              "images/tH_nE_thumbnail.png", 
+              "images/tM_nE_thumbnail.png"
 )
 
 pimage <- axis_canvas(lineups_or_plot, axis = 'y') + 
