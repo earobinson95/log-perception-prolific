@@ -17,6 +17,7 @@ knitr::opts_chunk$set(
 	echo = FALSE,
 	message = FALSE,
 	warning = FALSE,
+	cache = TRUE,
 	fig.align = 'center'
 )
 library(tidyverse)
@@ -38,7 +39,7 @@ source("gamm-predict-function.R")
 
 # Data
 
-```{r}
+```{r eval = F}
 # user data
 db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
@@ -101,22 +102,28 @@ youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols
 factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
 youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
 
-# read in youdrawit_model_data and eyefitting_simulated_data
-# youdrawit_model_data     <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-model-data.csv"))
-# youdrawit_simulated_data <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-simulated-data.csv"))
-```
-
-There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
-
-```{r}
 write.csv(youdrawit_model_data, file = here("analyses/02a-you-draw-it/data/youdrawit-model-data.csv"), row.names = F, na = "")
 write.csv(youdrawit_simulated_data, file = here("analyses/02a-you-draw-it/data/youdrawit-simulated-data.csv"), row.names = F, na = "")
+
+```
+
+
+```{r}
+# read in youdrawit_model_data and eyefitting_simulated_data
+youdrawit_model_data     <- read.csv(here("analyses/02a-you-draw-it/data/youdrawit-model-data.csv"))
+
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "plot_id", "beta", "points_truncated", "scale")
+youdrawit_model_data[,factorCols] <- lapply(youdrawit_model_data[,factorCols], factor)
+
+youdrawit_simulated_data <- read.csv(here("analyses/02a-you-draw-it/data/youdrawit-simulated-data.csv"))
 
 youdrawit_model_data %>%
   select(participant_id, beta, points_truncated, scale, x, ynls, ydrawn, yloess, residual_nls_drawn) %>%
   head() %>%
   knitr::kable()
 ```
+
+There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
 
 # Raw Plots
 
@@ -170,23 +177,24 @@ youdrawit_model_data %>%
 
 # Smoothing Splines (GAMM)
 
-```{r, eval = F, echo = T}
-#tic()
+```{r, eval = F, echo = F}
+tic()
 exp.gamm.reduced <- bam(residual_nls_drawn ~ -1 + beta:points_truncated:scale + 
                         s(x, by = beta:points_truncated:scale) +
                         s(participant_id, bs = "re") +
                         s(x,participant_id, bs = "re"),
                         method = "REML",
                         data = youdrawit_model_data)
-# plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
-# toc()
+plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
+toc()
+
 # summary(exp.gamm.reduced)
-# anova(exp.gamm.reduced)
+anova(exp.gamm.reduced)
 
 # Obtain Predictions
-grid_data.exp.reduced <- expand_grid(beta = c("0.1", "0.23"),
+grid_data.exp.reduced <- expand_grid(beta = c("beta0.1", "beta0.23"),
                          points_truncated = c("10", "15"),
-                         scale = c("Linear", "Log"),
+                         scale = c("linear", "log"),
                          x = seq(10,20, 0.5),
                          participant_id = youdrawit_model_data$participant_id[1])
 preds.exp.reduced <- predict_gamm(exp.gamm.reduced, newdata = grid_data.exp.reduced, se = T, re_form = NA)
@@ -196,15 +204,19 @@ grid_data.exp.reduced$upper <- preds.exp.reduced$prediction + (1.96 * preds.exp.
 # head(grid_data.exp.reduced)
 ```
 
-```{r, eval = F, echo = T}
+```{r, eval = T, echo = F}
 # Plot Predictions
-write.csv(grid_data.exp.reduced, file = "data/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
+# write.csv(grid_data.exp.reduced, file = "data/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
+grid_data.exp.reduced <- read.csv(file = "data/youdrawit-exponential-prediction-gamm-preds.csv")
 
+# Plot predictions with individual lines
 grid_data.exp.reduced %>%
+  mutate(beta = substr(beta, 5,10)) %>%
   ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.4) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.7) +
   geom_line() +
-  geom_line(data = exp_data, aes(x = x, y = residualdrawn, group = plotID), alpha = 0.2) +
+  geom_line(data = youdrawit_model_data %>%
+  mutate(beta = substr(beta, 5,10)), aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
   theme_bw() +
@@ -215,10 +227,11 @@ grid_data.exp.reduced %>%
 
 # Plot Predictions
 grid_data.exp.reduced %>%
+  mutate(beta = substr(beta, 5,10)) %>%
   ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.4) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.3) +
   geom_line() +
-  # geom_line(data = exp_data, aes(x = x, y = residualdrawn, group = plotID), alpha = 0.2) +
+  # geom_line(data = youdrawit_model_data, aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
   theme_bw() +
