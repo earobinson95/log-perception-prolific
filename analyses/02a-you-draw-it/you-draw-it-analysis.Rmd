@@ -89,17 +89,17 @@ youdrawit_model_data <- loess_models %>%
   select(nick_name, ip_address, study_starttime, prolific_id, age, gender, academic_study, computer_mouse, recruitment, participant_id, plot_id, beta, points_truncated, scale, start_time, end_time, x, ynls, ydrawn, yloess, residual_nls_drawn, residual_nls_loess)
 
 # simulated data
-# youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols)  %>%
-#   # filter(recruitment != "I am the researcher") %>%
-#   filter(parm_id %notin% c("F", "S", "N", "V")) %>%
-#   separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
-#   mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
-#   rowwise() %>%
-#   mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, beta, points_truncated, scale, sep = "-"), "md5")), .before = beta) %>%
-#   mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = data_id)
+youdrawit_simulated_data <- right_join(users, youdrawit_simulated, by = joinCols)  %>%
+  # filter(recruitment != "I am the researcher") %>%
+  filter(parm_id %notin% c("F", "S", "N", "V")) %>%
+  separate(parm_id, into = c("beta", "points_truncated", "scale"), sep = "-") %>%
+  mutate(scale = ifelse(scale == "false", "log", "linear")) %>%
+  rowwise() %>%
+  mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, beta, points_truncated, scale, sep = "-"), "md5")), .before = beta) %>%
+  mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = data_id)
 
-# factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
-# youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "beta", "points_truncated", "scale", "data_id", "dataset")
+youdrawit_simulated_data[,factorCols] <- lapply(youdrawit_simulated_data[,factorCols], factor)
 
 # read in youdrawit_model_data and eyefitting_simulated_data
 # youdrawit_model_data     <- read.csv(here("analyses/02a-youdrawit/data/youdrawit-model-data.csv"))
@@ -109,8 +109,8 @@ youdrawit_model_data <- loess_models %>%
 There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
 
 ```{r}
-# write.csv(youdrawit_model_data, file = here("analyses/02a-you-draw-it/data/youdrawit-model-data.csv"), row.names = F, na = "")
-# write.csv(youdrawit_simulated_data, file = here("analyses/02a-you-draw-it/data/youdrawit-simulated-data.csv"), row.names = F, na = "")
+write.csv(youdrawit_model_data, file = here("analyses/02a-you-draw-it/data/youdrawit-model-data.csv"), row.names = F, na = "")
+write.csv(youdrawit_simulated_data, file = here("analyses/02a-you-draw-it/data/youdrawit-simulated-data.csv"), row.names = F, na = "")
 
 youdrawit_model_data %>%
   select(participant_id, beta, points_truncated, scale, x, ynls, ydrawn, yloess, residual_nls_drawn) %>%
@@ -172,13 +172,13 @@ youdrawit_model_data %>%
 
 ```{r, eval = F, echo = T}
 #tic()
-exp.gamm.reduced <- bam(residualdrawn ~ -1 + beta:points_truncated:scale + 
+exp.gamm.reduced <- bam(residual_nls_drawn ~ -1 + beta:points_truncated:scale + 
                         s(x, by = beta:points_truncated:scale) +
                         s(participant_id, bs = "re") +
                         s(x,participant_id, bs = "re"),
                         method = "REML",
-                        data = exp_data)
-plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
+                        data = youdrawit_model_data)
+# plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
 # toc()
 # summary(exp.gamm.reduced)
 # anova(exp.gamm.reduced)
@@ -188,7 +188,7 @@ grid_data.exp.reduced <- expand_grid(beta = c("0.1", "0.23"),
                          points_truncated = c("10", "15"),
                          scale = c("Linear", "Log"),
                          x = seq(10,20, 0.5),
-                         participant_id = exp_data$participant_id[1])
+                         participant_id = youdrawit_model_data$participant_id[1])
 preds.exp.reduced <- predict_gamm(exp.gamm.reduced, newdata = grid_data.exp.reduced, se = T, re_form = NA)
 grid_data.exp.reduced$estimate <- preds.exp.reduced$prediction
 grid_data.exp.reduced$lower <- preds.exp.reduced$prediction - (1.96 * preds.exp.reduced$se)
@@ -198,7 +198,7 @@ grid_data.exp.reduced$upper <- preds.exp.reduced$prediction + (1.96 * preds.exp.
 
 ```{r, eval = F, echo = T}
 # Plot Predictions
-write.csv(grid_data.exp.reduced, file = "results/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
+write.csv(grid_data.exp.reduced, file = "data/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
 
 grid_data.exp.reduced %>%
   ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
