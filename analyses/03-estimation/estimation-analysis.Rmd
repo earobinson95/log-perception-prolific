@@ -148,6 +148,39 @@ dbDisconnect(db_con)
 
 # read in estimation_model_data
 estimation_model_data     <- read.csv(here("analyses/03-estimation/estimation-model-data.csv"))
+
+# plot functions
+estimationPlots <- function(q_data){
+
+estimation_plot <- q_data %>%
+  ggplot(aes(x = scale, y = response, group = participant_id, color = scale, label = paste(calculation, "\n", scratchpad))) +
+  geom_linerange(aes(ymin = true_value, ymax = response), position = position_dodge2(0.95), alpha = 0.8, size = 0.1) +
+  geom_point(position = position_dodge2(0.95), alpha = 0.8, size = 0.8, shape = 1) +
+  geom_hline(aes(yintercept = true_value), linetype = "dashed") +
+  facet_wrap(~q_id, scales = "free") +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  scale_color_manual(values = c("steelblue", "orange"), guide = guide_legend(override.aes = list(size = 1.5, alpha = 1) ))
+
+return(estimation_plot)  
+
+}
+
+estimationPlots_closest_pt <- function(q_data){
+  
+  estimation_plot <- q_data %>%
+    ggplot(aes(x = scale, y = response, group = participant_id, color = scale, label = paste(calculation, "\n", scratchpad))) +
+    geom_linerange(aes(ymin = closest_pt_value, ymax = response), position = position_dodge2(0.95), alpha = 0.8, size = 0.1) +
+    geom_point(position = position_dodge2(0.95), alpha = 0.8, size = 0.8, shape = 1) +
+    geom_hline(aes(yintercept = closest_pt_value), linetype = "dashed") +
+    facet_wrap(~q_id + dataset, scales = "free_x") +
+    theme_bw() +
+    theme(axis.text.x = element_blank()) +
+    scale_color_manual(values = c("steelblue", "orange"), guide = guide_legend(override.aes = list(size = 1.5, alpha = 1) ))
+  
+  return(estimation_plot)  
+
+}
 ```
 
 A total of `r unique(estimation_model_data$participant_id) %>% length()` participants each completed all 12 estimation questions for a total of `r (unique(estimation_model_data$participant_id) %>% length())*12` estimations.
@@ -175,29 +208,6 @@ estimation_model_data %>%
   knitr::kable()
 ```
 
-```{r, eval = T}
-
-estimationPlots <- function(qID){
-
-estimation_plot <- estimation_model_data %>%
-  # filter(q_id == "QE1") %>%
-    filter(q_id == qID) %>%
-  mutate(response = as.numeric(response)) %>%
-  ggplot(aes(x = scale, y = response, group = participant_id, color = scale, label = paste(calculation, "\n", scratchpad))) +
-  geom_linerange(aes(ymin = true_value, ymax = response), position = position_dodge2(0.95), alpha = 0.8, size = 0.1) +
-  geom_point(position = position_dodge2(0.95), alpha = 0.8, size = 0.8, shape = 1) +
-  geom_hline(aes(yintercept = true_value), linetype = "dashed") +
-  facet_wrap(~q_id, scales = "free") +
-  theme_bw() +
-  theme(axis.text.x = element_blank()) +
-  # theme(aspect.ratio = 1) +
-  # ggtitle(paste(estimation_questions$qtext[estimation_questions$q_id == qID][1], "\n ", estimation_questions$qtext[estimation_questions$q_id == qID][2])) +
-  scale_color_manual(values = c("steelblue", "orange"))
-
-return(estimation_plot)  
-
-}
-```
 
 ```{r, eval = F}
 simulated_linear_plot <- estimation_simulated_data %>%
@@ -307,6 +317,26 @@ estimation_simulated_data %>%
   knitr::kable(digits = 2)
 ```
 
+## Data
+
+Truncated at 5000.
+
+```{r}
+qe1_data <- estimation_model_data %>% 
+  filter(q_id == "QE1") %>%
+  mutate(response = as.numeric(response),
+         closest_pt_value = ifelse(dataset == "dataset1", 445.4833, 466.8964),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation) %>%
+  filter(response <= 5000)
+
+qe1_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QE1 data set example")
+```
+
 ## Exploration
 
 ```{r, out.width = "80%"}
@@ -316,113 +346,151 @@ knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-l
 
 <div class = 'center'>
 ```{r}
-estimation_plotQE1 <- estimationPlots("QE1")
+estimation_plotQE1 <- estimationPlots(qe1_data)
 ggplotly(estimation_plotQE1)
 ```
 </div>
-
-## Data
-
-```{r}
-qe1_data <- estimation_model_data %>% 
-  filter(q_id == "QE1") %>%
-  mutate(response = as.numeric(response),
-         closest_pt_value = ifelse(dataset == "dataset1", 445.4833, 466.8964),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation)
-
-qe1_data %>%
-  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
-  head() %>%
-  knitr::kable(digits = 2, caption = "QE1 data set example")
-```
-
-## Common Responses
-
-```{r}
-qe1_common_responses <- qe1_data %>%
-  group_by(scale, response) %>%
-  summarize(count = n()) %>%
-  filter(count > 5) %>%
-  arrange(scale, -count)
-
-qe1_common_plot_linear <- qe1_common_responses %>%
-  filter(scale == "linear") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qe1_common_plot_log <- qe1_common_responses %>%
-  filter(scale == "log2") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qe1_common_plot_linear + qe1_common_plot_log
-```
 
 ## Main Take Aways
 
 ### More varability in the estimation made on the linear scale
 
-<!-- ## Wilcox  -->
+```{r}
+qe1_data %>%
+  group_by(dataset, scale) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
 
-<!-- ### True value absolute deviation -->
+qe1_common_plotv3 <- qe1_data %>%
+  ggplot(aes(x = response, fill = scale)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(~ dataset) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dashed", "dotted")) +
+  scale_x_continuous("Estimated Population", limits = c(0, 1000)) +
+  scale_y_continuous("Density")
+qe1_common_plotv3
+```
 
-<!-- ```{r} -->
-<!-- qe1_data %>% -->
-<!--   group_by(scale) %>% -->
-<!--   get_summary_stats(abs_deviation, type = "median_iqr") %>% -->
-<!--   knitr::kable(digits = 2) -->
+### Participants Anchored their Estimates
 
-<!-- qe1_data %>% -->
-<!--   ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) + -->
-<!--   geom_jitter(alpha = 0.05) + -->
-<!--   geom_boxplot(alpha = 0.3, width = 0.2) + -->
-<!--   theme_bw() + -->
-<!--   theme(aspect.ratio = 1) + -->
-<!--   facet_zoom(ylim = c(0,1500)) + -->
-<!--   scale_color_manual(values = c("steelblue", "orange3")) + -->
-<!--   scale_fill_manual(values = c("steelblue", "orange3")) -->
+**Sub idea:** Participants are estimated based on the points, not based on the visually fitted trend. This is stronger in QE2.
 
-<!-- qe1_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe1_data) -->
-<!-- qe1_kwMod -->
-<!-- qe1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe1_data) -->
-<!-- qe1_wilcoxMod -->
-<!-- ``` -->
+```{r}
+qe1_common_responses <- qe1_data %>%
+  group_by(scale, dataset, true_value, closest_pt_value, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(scale, -count)
 
-<!-- ### Closest point absolute deviation -->
+qe1_common_plotv1 <- qe1_common_responses %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(0.9), alpha = 0.7) +
+  geom_point(position = position_dodge(0.9)) +
+  geom_hline(aes(yintercept = true_value, linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = closest_pt_value, linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_continuous("Estimated Population")
 
-<!-- ```{r} -->
-<!-- qe1_data %>% -->
-<!--   group_by(scale) %>% -->
-<!--   get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>% -->
-<!--   knitr::kable(digits = 2) -->
+# qe1_common_plotv1
 
-<!-- qe1_data %>% -->
-<!--   ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) + -->
-<!--   geom_jitter(alpha = 0.05) + -->
-<!--   geom_boxplot(alpha = 0.3, width = 0.2) + -->
-<!--   theme_bw() + -->
-<!--   theme(aspect.ratio = 1) + -->
-<!--   facet_zoom(ylim = c(0,1500)) + -->
-<!--   scale_color_manual(values = c("steelblue", "orange3")) + -->
-<!--   scale_fill_manual(values = c("steelblue", "orange3")) -->
+actual_values_data <- qe1_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "response") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = 0) %>%
+  unique() %>%
+  # mutate(response = round(response, 2)) %>%
+  select(scale, dataset, true_value, closest_pt_value, response, count)
 
-<!-- qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data) -->
-<!-- qe1_kwMod -->
-<!-- qe1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe1_data) -->
-<!-- qe1_wilcoxMod -->
-<!-- ``` -->
+qe1_common_responses <- qe1_common_responses %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qe1_common_responses$response, 2))) %>% sort()
+
+qe1_common_plotv2 <- qe1_common_responses %>%
+  mutate(response = round(response, 2)) %>%
+  mutate(response = factor(response, levels = response_order)) %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_discrete("Estimated Population") +
+  scale_x_continuous(expand = c(0,0))
+qe1_common_plotv2 
+```
+
+## Absolute deviation
+
+### True Value
+
+```{r}
+qe1_data %>%
+  group_by(scale) %>%
+  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe1_data %>%
+  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,1500)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+
+# qe1_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe1_data)
+# qe1_kwMod
+```
+
+### Closest point absolute deviation
+
+```{r}
+qe1_data %>%
+  group_by(scale) %>%
+  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe1_data %>%
+  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(0,1500)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3"))
+
+# qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
+# qe1_kwMod
+```
 
 # QE2: Estimate a year given a population
 
@@ -441,6 +509,24 @@ estimation_simulated_data %>%
   knitr::kable(digits = 2)
 ```
 
+## Data
+```{r}
+qe2_data <- estimation_model_data %>% 
+  filter(q_id == "QE2") %>%
+  mutate(response = as.numeric(response),
+         closest_pt_value = ifelse(dataset == "dataset1", 24, 27),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation) %>%
+  filter(response <= 50, response >= 0) %>%
+  mutate(true_value = round(true_value, 2))
+
+qe2_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QE2 data set example")
+```
+
 ## Exploration
 
 ```{r, out.width = "80%"}
@@ -450,91 +536,61 @@ knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-l
 
 <div class = 'center'>
 ```{r}
-estimation_plotQE2 <- estimationPlots("QE2")
+estimation_plotQE2 <- estimationPlots_closest_pt(qe2_data)
 ggplotly(estimation_plotQE2)
 ```
 </div>
 
-## Data
-```{r}
-qe2_data <- estimation_model_data %>% 
-  filter(q_id == "QE2") %>%
-  mutate(response = as.numeric(response),
-         closest_pt_value = ifelse(dataset == "dataset1", 24, 27),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation)
+## Main Take Aways
 
-qe2_data %>%
-  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
-  head() %>%
-  knitr::kable(digits = 2, caption = "QE2 data set example")
-```
+### Accuracy
 
-## Common Responses
-```{r}
-qe2_common_responses <- qe2_data %>%
-  group_by(scale, response) %>%
-  summarize(count = n()) %>%
-  filter(count > 5) %>%
-  arrange(scale, -count)
-
-qe2_common_plot_linear <- qe2_common_responses %>%
-  filter(scale == "linear") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qe2_common_plot_log <- qe2_common_responses %>%
-  filter(scale == "log2") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qe2_common_plot_linear + qe2_common_plot_log
-```
-
-## Wilcox 
-
-### True value absolute deviaiton
++ About the same on both scales, maybe a slight tendency to overestimate (maybe due to estimating the "visual trend" estimate on the log scale as indicated by data set 1?).
++ Not sure there is enough evidence to claim participants were more accurate on the linear scale, but would like to do more studies focusing on participants ability to read between the y-axis tick marks on the logarithmic scale. They could also be anchoring to the tick mark of 4096.
 
 ```{r}
 qe2_data %>%
-  group_by(scale) %>%
-  get_summary_stats(abs_deviation, type = "median_iqr") %>%
+  group_by(dataset, scale) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
   knitr::kable(digits = 2)
 
+qe2_density_plot <- qe2_data %>%
+  ggplot(aes(x = response, fill = scale)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(~ dataset) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dashed", "dotted")) +
+  scale_x_continuous("Estimated Year", limits = c(0, 50)) +
+  scale_y_continuous("Density")
+qe2_density_plot
+
 qe2_data %>%
-  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  ggplot(aes(x = scale, y = closest_pt_deviation, color = scale, fill = scale, shape = scale)) +
   geom_jitter(alpha = 0.05) +
   geom_boxplot(alpha = 0.3, width = 0.2) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,10)) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qe2_kwMod <- kruskal.test(abs_deviation ~ scale, data = qe2_data)
-qe2_kwMod
-qe2_wilcoxMod <- wilcox.test(abs_deviation ~ scale, data = qe2_data)
-qe2_wilcoxMod
-```
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_y_continuous(limits = c(-5,5)) +
+  ggtitle("Closest Point Deviation (by dataset)")
 
-### Closest point absolute deviation
-
-```{r}
 qe2_data %>%
-  group_by(scale) %>%
-  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+  ggplot(aes(x = scale, y = closest_pt_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_zoom(ylim = c(-5,5)) +
+  scale_color_manual(values = c("steelblue", "orange3")) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  ggtitle("Closest Point Deviation")
 
 qe2_data %>%
   ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
@@ -542,14 +598,81 @@ qe2_data %>%
   geom_boxplot(alpha = 0.3, width = 0.2) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,10)) +
+  facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qe2_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe2_data)
-qe2_kwMod
-qe2_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, data = qe2_data)
-qe2_wilcoxMod
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  ggtitle("Closest Point Absolute Deviation")
+```
+
+### Participants are basing estimates on the simulated data points and not on a visual trendline
+
++ but... based on the density plots above, on the log scale, participants might have a tendency to be fitting a visual trend first and then estimating as indicated by the overestimation on the log scale for data set 1.
+
+```{r}
+qe2_common_responses <- qe2_data %>%
+  mutate(true_value = round(true_value, 2)) %>%
+  group_by(scale, true_value, closest_pt_value, dataset, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(response)
+
+qe2_common_plotv1 <- qe2_common_responses %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(0.5), alpha = 0.7) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = true_value, linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = closest_pt_value, linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_continuous("Estimated Population")
+
+# qe2_common_plotv1
+
+actual_values_data <- qe2_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "response") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = NA) %>%
+  unique() %>%
+  # mutate(response = round(response, 2)) %>%
+  select(scale, dataset, true_value, closest_pt_value, response, count)
+
+qe2_common_responses <- qe2_common_responses %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qe2_common_responses$response, 2))) %>% sort()
+
+qe2_common_plotv2 <- qe2_common_responses %>%
+  mutate(response = round(response, 2)) %>%
+  mutate(response = factor(response, levels = response_order)) %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_discrete("Estimated Population") +
+  scale_x_continuous(expand = c(0,5))
+qe2_common_plotv2
 ```
 
 # QI1: Estimate an additive increase in population between two years
@@ -572,7 +695,29 @@ estimation_simulated_data %>%
 ```
 
 
+## Data
+
++ Truncate data at 30000.
+
+```{r}
+qi1_data <- estimation_model_data %>% 
+  filter(q_id == "QI1") %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 15517.75, 22897.43),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation) %>%
+  filter(response < 30000)
+
+qi1_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI1 data set example")
+```
+
 ## Exploration
+
++ Quite a few responses in the 10 - 30 range??
 
 ```{r, out.width = "80%"}
 knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-linear-plot-QI1.png"))
@@ -581,136 +726,144 @@ knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-l
 
 <div class = 'center'>
 ```{r}
-estimation_plotQI1 <- estimationPlots("QI1")
+estimation_plotQI1 <- estimationPlots_closest_pt(qi1_data)
 ggplotly(estimation_plotQI1)
 ```
 </div>
 
-## Data
-```{r}
-qi1_data <- estimation_model_data %>% 
-  filter(q_id == "QI1") %>%
-  mutate(response = as.numeric(response)) %>%
-  mutate(closest_pt_value = ifelse(dataset == "dataset1", 15517.75, 22897.43),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation)
+## Main Take Aways
 
-qi1_data %>%
-  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
-  head() %>%
-  knitr::kable(digits = 2, caption = "QI1 data set example")
-```
+### Accuracy
 
-## Common Responses
-```{r}
-qi1_common_responses <- qi1_data %>%
-  group_by(scale, response) %>%
-  summarize(count = n()) %>%
-  filter(count > 5) %>%
-  arrange(scale, -count)
-
-qi1_common_plot_linear <- qi1_common_responses %>%
-  filter(scale == "linear") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi1_common_plot_log <- qi1_common_responses %>%
-  filter(scale == "log2") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi1_common_plot_linear + qi1_common_plot_log
-```
++ Tendency to underestimate the difference (for closest point) and tendency to overestimate the difference (for true value). 
 
 ```{r}
 qi1_data %>%
-  # filter(response < 40000, response > 5000) %>%
-  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
+  group_by(dataset, scale) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi1_density_plot <- qi1_data %>%
+  filter(response >= 1000) %>%
+  ggplot(aes(x = response, fill = scale)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(~ dataset) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(5000,30000)) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_x_continuous("Estimated Difference in Population") +
+  scale_y_continuous("Density")
+qi1_density_plot
+
+qi1_data %>%
+  group_by(dataset, scale) %>%
+  get_summary_stats(closest_pt_deviation, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi1_data %>%
+  filter(response >= 1000) %>%
+  ggplot(aes(x = scale, y = closest_pt_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  geom_hline(aes(yintercept = 0), color = "gray30") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
   scale_fill_manual(values = c("steelblue", "orange3")) +
-  ggtitle("Raw Responses")
-```
-
-## Wilcox 
-
-### True value absolute deviaiton
-
-```{r}
-qi1_data %>% 
-  # filter(response < 40000, response > 5000) %>%
-  group_by(scale) %>%
-  get_summary_stats(abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+  scale_y_continuous("Estimated Deviation") +
+  ggtitle("Closest Point Deviation (by dataset)")
 
 qi1_data %>%
-  # filter(response < 40000, response > 5000) %>%
-  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  filter(response >= 1000) %>%
+  ggplot(aes(x = scale, y = deviation, color = scale, fill = scale, shape = scale)) +
   geom_jitter(alpha = 0.05) +
   geom_boxplot(alpha = 0.3, width = 0.2) +
+  geom_hline(aes(yintercept = 0), color = "gray30") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,20000)) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi1_kwMod <- kruskal.test(abs_deviation ~ scale, 
-                          data = qi1_data
-                          # data = qi1_data %>% filter(response < 40000, response > 5000)
-                          )
-qi1_kwMod
-qi1_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
-                          data = qi1_data
-                          # data = qi1_data %>% filter(response < 40000, response > 5000)
-                          )
-qi1_wilcoxMod
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_y_continuous("Estimated Deviation") +
+  ggtitle("True Deviation (by dataset)")
 ```
 
-### Closest point absolute deviation
+### Anchoring & Reading Points
+
++ For example, 16384 - 1024 = 15360, but that 15000 is still strong.
++ Data set 2 has higher estimates (aka reading the points).
 
 ```{r}
-qi1_data %>% 
-  # filter(response < 40000, response > 5000) %>%
-  group_by(scale) %>%
-  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+qi1_common_responses <- qi1_data %>%
+  mutate(true_value = round(true_value, 2)) %>%
+  group_by(scale, true_value, closest_pt_value, dataset, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(response)
 
-qi1_data %>%
-  # filter(response < 40000, response > 5000) %>%
-  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
+qi1_common_plotv1 <- qi1_common_responses %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(0.5), alpha = 0.7) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = true_value, linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = closest_pt_value, linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,20000)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi1_data
-                          # data = qi1_data %>% filter(response < 40000, response > 5000)
-                          )
-qi1_kwMod
-qi1_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi1_data
-                          # data = qi1_data %>% filter(response < 40000, response > 5000)
-                          )
-qi1_wilcoxMod
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_continuous("Estimated Population")
+
+# qi1_common_plotv1
+
+actual_values_data <- qi1_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "response") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = NA) %>%
+  unique() %>%
+  # mutate(response = round(response, 2)) %>%
+  select(scale, dataset, true_value, closest_pt_value, response, count)
+
+qi1_common_responses <- qi1_common_responses %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qi1_common_responses$response, 2))) %>% sort()
+
+qi1_common_plotv2 <- qi1_common_responses %>%
+  mutate(response = round(response, 2)) %>%
+  mutate(response = factor(response, levels = response_order)) %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_discrete("Estimated Population") +
+  scale_x_continuous(expand = c(0,0.5))
+qi1_common_plotv2
 ```
 
 # QI2: Estimate a multiplicative change in population between two years (i.e. how many times larger)
@@ -732,6 +885,26 @@ estimation_simulated_data %>%
   knitr::kable(digits = 2)
 ```
 
+## Data
+
++ Truncated at 30000, due to misunderstanding.
+
+```{r}
+qi2_data <- estimation_model_data %>% 
+  filter(q_id == "QI2") %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 11.15, 18.76),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation) %>%
+  filter(response < 30000)
+
+qi2_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI2 data set example")
+```
+
 
 ## Exploration
 
@@ -742,149 +915,148 @@ knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-l
 
 <div class = 'center'>
 ```{r}
-estimation_plotQI2 <- estimationPlots("QI2")
+estimation_plotQI2 <- estimationPlots_closest_pt(qi2_data)
 ggplotly(estimation_plotQI2)
 ```
 </div>
 
-## Data
-```{r}
-qi2_data <- estimation_model_data %>% 
-  filter(q_id == "QI2") %>%
-  mutate(response = as.numeric(response)) %>%
-  mutate(closest_pt_value = ifelse(dataset == "dataset1", 11.15, 18.76),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation)
+## Main Take Aways
 
-qi2_data %>%
-  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
-  head() %>%
-  knitr::kable(digits = 2, caption = "QI2 data set example")
+### Basic lack of understanding
+
++ Describe logic from calculation and scratchpad.
++ 15000 was still a common response.
+
+```{r}
+estimation_plotQI2
 ```
 
-## Common Responses
-```{r}
-qi2_common_responses <- qi2_data %>%
-  group_by(scale, response) %>%
-  summarize(count = n()) %>%
-  filter(count > 5) %>%
-  arrange(scale, -count)
+### Accuracy
 
-qi2_common_plot_linear <- qi2_common_responses %>%
-  filter(scale == "linear") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi2_common_plot_log <- qi2_common_responses %>%
-  filter(scale == "log2") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi2_common_plot_linear + qi2_common_plot_log
-
-# Define the number of colors you want
-# nb.cols <- unique(qi2_common_responses$count) %>% length()
-# mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
-# 
-# set.seed(68505)
-# qi2_common_responses %>%
-#   ggplot(aes(label = round(response,2), size = count, color = as.factor(count))) +
-#   geom_text_wordcloud() +
-#   scale_size_area(max_size = 20) +
-#   facet_grid(~scale) +
-#   theme_test() +
-#   scale_color_manual(values = mycolors)
-```
++ Larger variability on linear scale.
 
 ```{r}
 qi2_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
+  group_by(dataset, scale) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi2_density_plot <- qi2_data %>%
+  filter(response < 20) %>%
+  ggplot(aes(x = response, fill = scale)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(~ dataset) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0, 25)) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_x_continuous("Estimated Difference in Population") +
+  scale_y_continuous("Density")
+qi2_density_plot
+
+qi2_data %>%
+  filter(response < 20) %>%
+  ggplot(aes(x = scale, y = closest_pt_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  geom_hline(aes(yintercept = 0), color = "gray30") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
   scale_fill_manual(values = c("steelblue", "orange3")) +
-  ggtitle("Raw Responses")
-```
-
-## Wilcox 
-
-### True value absolute deviaiton
-
-```{r}
-qi2_data %>% 
-  # filter(response < 25) %>%
-  group_by(scale) %>%
-  get_summary_stats(abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+  scale_y_continuous("Estimated Deviation") +
+  ggtitle("Closest Point Deviation (by dataset)")
 
 qi2_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
+  filter(response < 20) %>%
+  ggplot(aes(x = scale, y = deviation, color = scale, fill = scale, shape = scale)) +
   geom_jitter(alpha = 0.05) +
   geom_boxplot(alpha = 0.3, width = 0.2) +
+  geom_hline(aes(yintercept = 0), color = "gray30") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,25)) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi2_kwMod <- kruskal.test(abs_deviation ~ scale, 
-                          data = qi2_data
-                          # data = qi2_data %>% filter(response < 25)
-                          )
-qi2_kwMod
-qi2_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
-                          data = qi2_data
-                          # data = qi2_data %>% filter(response < 40000, response > 5000)
-                          )
-qi2_wilcoxMod
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_y_continuous("Estimated Deviation") +
+  ggtitle("True Deviation (by dataset)")
 ```
 
-### Closest point absolute deviation
+### Common points
+
++ Not as strong of an anchoring sense here.
++ Appears to be reading the points.
 
 ```{r}
-qi2_data %>% 
-  # filter(response < 25) %>%
-  group_by(scale) %>%
-  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+qi2_common_responses <- qi2_data %>%
+  mutate(true_value = round(true_value, 2)) %>%
+  group_by(scale, true_value, closest_pt_value, dataset, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(response)
 
-qi2_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
+qi2_common_plotv1 <- qi2_common_responses %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(0.5), alpha = 0.7) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = true_value, linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = closest_pt_value, linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,25)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi2_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi2_data
-                          # data = qi2_data %>% filter(response < 40000, response > 5000)
-                          )
-qi2_kwMod
-qi2_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi2_data
-                          # data = qi2_data %>% filter(response < 40000, response > 5000)
-                          )
-qi2_wilcoxMod
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_continuous("Estimated Population")
+
+# qi2_common_plotv1
+
+actual_values_data <- qi2_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "response") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = NA) %>%
+  unique() %>%
+  # mutate(response = round(response, 2)) %>%
+  select(scale, dataset, true_value, closest_pt_value, response, count)
+
+qi2_common_responses <- qi2_common_responses %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qi2_common_responses$response, 2))) %>% sort()
+
+qi2_common_plotv2 <- qi2_common_responses %>%
+  mutate(response = round(response, 2)) %>%
+  mutate(response = factor(response, levels = response_order)) %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_discrete("Estimated Population") +
+  scale_x_continuous(expand = c(0,0.5))
+qi2_common_plotv2
 ```
 
 # QI3: Estimate the number of years necessary to double the population
@@ -916,6 +1088,22 @@ estimation_simulated_data %>%
   knitr::kable(digits = 2)
 ```
 
+## Data
+```{r}
+qi3_data <- estimation_model_data %>% 
+  filter(q_id == "QI3") %>%
+  mutate(response = as.numeric(response)) %>%
+  mutate(closest_pt_value = ifelse(dataset == "dataset1", 4, 6),
+         closest_pt_deviation = response - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation),
+         .after = abs_deviation) %>%
+  filter(response < 50)
+
+qi3_data %>%
+  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
+  head() %>%
+  knitr::kable(digits = 2, caption = "QI3 data set example")
+```
 
 ## Exploration
 
@@ -926,148 +1114,121 @@ knitr::include_graphics(here("analyses/03-estimation/simulated-plots/simulated-l
 
 <div class = 'center'>
 ```{r}
-estimation_plotQI3 <- estimationPlots("QI3")
+estimation_plotQI3 <- estimationPlots_closest_pt(qi3_data)
 ggplotly(estimation_plotQI3)
 ```
 </div>
 
-## Data
-```{r}
-qi3_data <- estimation_model_data %>% 
-  filter(q_id == "QI3") %>%
-  # filter(response < 100) %>%
-  mutate(response = as.numeric(response)) %>%
-  mutate(closest_pt_value = ifelse(dataset == "dataset1", 4, 6),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation)
 
-qi3_data %>%
-  select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
-  head() %>%
-  knitr::kable(digits = 2, caption = "QI3 data set example")
-```
+## Main Take Aways
 
-## Common Responses
-```{r}
-qi3_common_responses <- qi3_data %>%
-  group_by(scale, response) %>%
-  summarize(count = n()) %>%
-  filter(count > 5) %>%
-  arrange(scale, -count)
+### Accuracy
 
-qi3_common_plot_linear <- qi3_common_responses %>%
-  filter(scale == "linear") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi3_common_plot_log <- qi3_common_responses %>%
-  filter(scale == "log2") %>%
-  ggplot(aes(x = count, y = reorder(as.factor(response), count))) +
-  geom_segment(aes(x = 0, xend = count, yend = reorder(as.factor(response), count))) +
-  geom_point() +
-  facet_grid(~scale) +
-  theme_test() +
-  theme(aspect.ratio = 1) +
-  scale_y_discrete("Response")
-
-qi3_common_plot_linear + qi3_common_plot_log
-
-# Define the number of colors you want
-# nb.cols <- unique(qi3_common_responses$count) %>% length()
-# mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
-# 
-# set.seed(68505)
-# qi3_common_responses %>%
-#   ggplot(aes(label = round(response,2), size = count, color = as.factor(count))) +
-#   geom_text_wordcloud() +
-#   scale_size_area(max_size = 20) +
-#   facet_grid(~scale) +
-#   theme_test() +
-#   scale_color_manual(values = mycolors)
-```
++ Larger variability on linear scale.
++ More accurate on log scale??
 
 ```{r}
 qi3_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = response, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
+  group_by(dataset, scale) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qi3_density_plot <- qi3_data %>%
+  ggplot(aes(x = response, fill = scale)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(~ dataset) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0, 25)) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_x_continuous("Estimated Difference in Population") +
+  scale_y_continuous("Density")
+qi3_density_plot
+
+qi3_data %>%
+  ggplot(aes(x = scale, y = closest_pt_deviation, color = scale, fill = scale, shape = scale)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot(alpha = 0.3, width = 0.2) +
+  geom_hline(aes(yintercept = 0), color = "gray30") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~dataset) +
+  # facet_zoom(ylim = c(-5,5)) +
   scale_color_manual(values = c("steelblue", "orange3")) +
   scale_fill_manual(values = c("steelblue", "orange3")) +
-  ggtitle("Raw Responses")
+  scale_y_continuous("Estimated Deviation") +
+  ggtitle("Closest Point Deviation (by dataset)")
 ```
 
-## Wilcox 
+### Common points
 
-### True value absolute deviaiton
-
-```{r}
-qi3_data %>% 
-  # filter(response < 25) %>%
-  group_by(scale) %>%
-  get_summary_stats(abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
-
-qi3_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,25)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi3_kwMod <- kruskal.test(abs_deviation ~ scale, 
-                          data = qi3_data
-                          # data = qi3_data %>% filter(response < 25)
-                          )
-qi3_kwMod
-qi3_wilcoxMod <- wilcox.test(abs_deviation ~ scale, 
-                          data = qi3_data
-                          # data = qi3_data %>% filter(response < 40000, response > 5000)
-                          )
-qi3_wilcoxMod
-```
-
-### Closest point absolute deviation
++ Strong anchoring at 5 and 10.
 
 ```{r}
-qi3_data %>% 
-  # filter(response < 25) %>%
-  group_by(scale) %>%
-  get_summary_stats(closest_pt_abs_deviation, type = "median_iqr") %>%
-  knitr::kable(digits = 2)
+qi3_common_responses <- qi3_data %>%
+  mutate(true_value = round(true_value, 2)) %>%
+  group_by(scale, true_value, closest_pt_value, dataset, response) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(response)
 
-qi3_data %>%
-  # filter(response < 25) %>%
-  ggplot(aes(x = scale, y = closest_pt_abs_deviation, color = scale, fill = scale, shape = scale)) +
-  geom_jitter(alpha = 0.05) +
-  geom_boxplot(alpha = 0.3, width = 0.2) +
-  theme_bw() +
+qi3_common_plotv1 <- qi3_common_responses %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(0.5), alpha = 0.7) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = true_value, linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = closest_pt_value, linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
   theme(aspect.ratio = 1) +
-  facet_zoom(ylim = c(0,25)) +
-  scale_color_manual(values = c("steelblue", "orange3")) +
-  scale_fill_manual(values = c("steelblue", "orange3"))
-  
-qi3_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi3_data
-                          # data = qi3_data %>% filter(response < 40000, response > 5000)
-                          )
-qi3_kwMod
-qi3_wilcoxMod <- wilcox.test(closest_pt_abs_deviation ~ scale, 
-                          data = qi3_data
-                          # data = qi3_data %>% filter(response < 40000, response > 5000)
-                          )
-qi3_wilcoxMod
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_continuous("Estimated Population")
+
+# qi3_common_plotv1
+
+actual_values_data <- qi3_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "response") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = NA) %>%
+  unique() %>%
+  # mutate(response = round(response, 2)) %>%
+  select(scale, dataset, true_value, closest_pt_value, response, count)
+
+qi3_common_responses <- qi3_common_responses %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qi3_common_responses$response, 2))) %>% sort()
+
+qi3_common_plotv2 <- qi3_common_responses %>%
+  mutate(response = round(response, 2)) %>%
+  mutate(response = factor(response, levels = response_order)) %>%
+  ggplot(aes(x = count, xmin = 0, xmax = count, y = response, color = scale, shape = scale)) +
+  geom_linerange(position = position_dodge(.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True"), size = 0.8) +
+  geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point"), size = 0.8) +
+  facet_grid(~ dataset) +
+  theme_test() +
+  theme(aspect.ratio = 1) +
+  scale_shape_manual("Scale", values = c(1,2)) +
+  scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dotted", "dashed")) +
+  scale_y_discrete("Estimated Population") +
+  scale_x_continuous(expand = c(0,0.5))
+qi3_common_plotv2
 ```
