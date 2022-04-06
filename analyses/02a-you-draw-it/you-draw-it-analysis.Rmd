@@ -177,6 +177,8 @@ youdrawit_model_data %>%
 
 # Smoothing Splines (GAMM)
 
+## Both Betas
+
 ```{r, eval = F, echo = F}
 tic()
 exp.gamm.reduced <- bam(residual_nls_drawn ~ -1 + beta:points_truncated:scale + 
@@ -202,11 +204,11 @@ grid_data.exp.reduced$estimate <- preds.exp.reduced$prediction
 grid_data.exp.reduced$lower <- preds.exp.reduced$prediction - (1.96 * preds.exp.reduced$se)
 grid_data.exp.reduced$upper <- preds.exp.reduced$prediction + (1.96 * preds.exp.reduced$se)
 # head(grid_data.exp.reduced)
+write.csv(grid_data.exp.reduced, file = "data/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
 ```
 
 ```{r, eval = T, echo = F}
 # Plot Predictions
-# write.csv(grid_data.exp.reduced, file = "data/youdrawit-exponential-prediction-gamm-preds.csv", row.names = F, na = "")
 grid_data.exp.reduced <- read.csv(file = "data/youdrawit-exponential-prediction-gamm-preds.csv")
 
 # Plot predictions with individual lines
@@ -227,6 +229,138 @@ grid_data.exp.reduced %>%
 
 # Plot Predictions
 grid_data.exp.reduced %>%
+  mutate(beta = substr(beta, 5,10)) %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.3) +
+  geom_line() +
+  # geom_line(data = youdrawit_model_data, aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+```
+
+## Beta 0.1
+
+```{r, eval = F, echo = F}
+tic()
+exp.gamm.reduced_0.1 <- bam(residual_nls_drawn ~ -1 + points_truncated:scale + 
+                        s(x, by = points_truncated:scale) +
+                        s(participant_id, bs = "re") +
+                        s(x,participant_id, bs = "re"),
+                        method = "REML",
+                        data = youdrawit_model_data %>% filter(beta == "beta0.1"))
+# plot(exp.gamm.reduced_0.1, pages = 2,all.terms=TRUE)
+toc()
+
+# summary(exp.gamm.reduced_0.1)
+anova(exp.gamm.reduced_0.1)
+
+# Obtain Predictions
+grid_data.exp.reduced_0.1 <- expand_grid(beta = c("beta0.1"),
+                         points_truncated = c("10", "15"),
+                         scale = c("linear", "log"),
+                         x = seq(10,20, 0.5),
+                         participant_id = youdrawit_model_data$participant_id[1])
+preds.exp.reduced_0.1 <- predict_gamm(exp.gamm.reduced_0.1, newdata = grid_data.exp.reduced_0.1, se = T, re_form = NA)
+grid_data.exp.reduced_0.1$estimate <- preds.exp.reduced_0.1$prediction
+grid_data.exp.reduced_0.1$lower <- preds.exp.reduced_0.1$prediction - (1.96 * preds.exp.reduced_0.1$se)
+grid_data.exp.reduced_0.1$upper <- preds.exp.reduced_0.1$prediction + (1.96 * preds.exp.reduced_0.1$se)
+# head(grid_data.exp.reduced_0.1)
+write.csv(grid_data.exp.reduced_0.1, file = "data/youdrawit-exponential-prediction-gamm-preds-0.1.csv", row.names = F, na = "")
+```
+
+```{r, eval = T, echo = F}
+# Plot Predictions
+grid_data.exp.reduced_0.1 <- read.csv(file = "data/youdrawit-exponential-prediction-gamm-preds-0.1.csv")
+
+# Plot predictions with individual lines
+grid_data.exp.reduced_0.1 %>%
+  mutate(beta = substr(beta, 5,10)) %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.7) +
+  geom_line() +
+  geom_line(data = youdrawit_model_data %>% filter(beta == "beta0.1") %>% mutate(beta = substr(beta, 5,10)), 
+            aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+
+# Plot Predictions
+grid_data.exp.reduced_0.1 %>%
+  mutate(beta = substr(beta, 5,10)) %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.3) +
+  geom_line() +
+  # geom_line(data = youdrawit_model_data, aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+```
+
+## Beta 0.23
+
+```{r, eval = F, echo = F}
+tic()
+exp.gamm.reduced_0.23 <- bam(residual_nls_drawn ~ -1 + points_truncated:scale + 
+                        s(x, by = points_truncated:scale) +
+                        s(participant_id, bs = "re") +
+                        s(x,participant_id, bs = "re"),
+                        method = "REML",
+                        data = youdrawit_model_data %>% filter(beta == "beta0.23"))
+# plot(exp.gamm.reduced, pages = 2,all.terms=TRUE)
+toc()
+
+# summary(exp.gamm.reduced)
+anova(exp.gamm.reduced_0.23)
+
+# Obtain Predictions
+grid_data.exp.reduced_0.23 <- expand_grid(beta = c("beta0.23"),
+                         points_truncated = c("10", "15"),
+                         scale = c("linear", "log"),
+                         x = seq(10,20, 0.5),
+                         participant_id = youdrawit_model_data$participant_id[1])
+preds.exp.reduced_0.23 <- predict_gamm(exp.gamm.reduced_0.23, newdata = grid_data.exp.reduced_0.23, se = T, re_form = NA)
+grid_data.exp.reduced_0.23$estimate <- preds.exp.reduced_0.23$prediction
+grid_data.exp.reduced_0.23$lower <- preds.exp.reduced_0.23$prediction - (1.96 * preds.exp.reduced_0.23$se)
+grid_data.exp.reduced_0.23$upper <- preds.exp.reduced_0.23$prediction + (1.96 * preds.exp.reduced_0.23$se)
+# head(grid_data.exp.reduced_0.23)
+write.csv(grid_data.exp.reduced_0.23, file = "data/youdrawit-exponential-prediction-gamm-preds-0.23.csv", row.names = F, na = "")
+```
+
+```{r, eval = T, echo = F}
+# Plot Predictions
+grid_data.exp.reduced_0.23 <- read.csv(file = "data/youdrawit-exponential-prediction-gamm-preds-0.23.csv")
+
+# Plot predictions with individual lines
+grid_data.exp.reduced_0.23 %>%
+  mutate(beta = substr(beta, 5,10)) %>%
+  ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.7) +
+  geom_line() +
+  geom_line(data = youdrawit_model_data %>% filter(beta == "beta0.23") %>% mutate(beta = substr(beta, 5,10)), 
+            aes(x = x, y = residual_nls_drawn, group = interaction(plot_id, scale)), alpha = 0.05) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(beta ~ points_truncated, scales = "free", labeller = labeller(beta = label_both, points_truncated = label_both)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_y_continuous("Residual \n (yloess - y)") +
+  scale_color_manual("Scale", values = c("steelblue", "orange")) +
+  scale_fill_manual("Scale", values = c("steelblue", "orange"))
+
+# Plot Predictions
+grid_data.exp.reduced_0.23 %>%
   mutate(beta = substr(beta, 5,10)) %>%
   ggplot(aes(x = x, y = estimate, group = scale, color = scale, fill = scale)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, alpha = 0.3) +
