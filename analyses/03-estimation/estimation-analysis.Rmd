@@ -54,7 +54,7 @@ library(wordcloud)
 library(RColorBrewer)
 library(wordcloud2)
 library(tm) 
-
+`%notin%` <- Negate(`%in%`)
 library(knitr)
 ```
 
