@@ -12,6 +12,9 @@ output:
     theme: lumen
 ---
 
+<!-- https://github.com/thomasp85/ggforce/issues/253 -->
+
+
 ```{css, echo=FALSE}
 .center {
   display: table;
@@ -28,10 +31,12 @@ knitr::opts_chunk$set(
 	cache = TRUE,
 	fig.align = 'center',
 	fig.width = 8,
-	fig.height = 4 #,
+	fig.height = 4 ,
+	dev = "ragg_png"
 	# options(knitr.kable.NA = '')#,
 	# options(knitr.table.format = "pandoc")
 )
+
 library(tidyverse)
 library(plotly)
 library(digest)
@@ -44,6 +49,7 @@ library(RSQLite)
 library(DBI)
 library(here)
 library(readr)
+library(readxl)
 
 library(lme4)
 library(emmeans)
@@ -57,8 +63,6 @@ library(tm)
 `%notin%` <- Negate(`%in%`)
 library(knitr)
 ```
-
-# Data
 
 ```{r, eval = F}
 # user data
@@ -133,8 +137,39 @@ estimation_model_data <- full_join(all_participants, estimation_feedback, by = j
 factorCols <- c("participant_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "q_id", "creature", "dataset", "scale")
 estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
 
-write.csv(estimation_model_data, file = here("analyses/03-estimation/estimation-model-data.csv"), row.names = F, na = "")
+write.csv(estimation_model_data, file = here("analyses/03-estimation/data/estimation-model-data-orig.csv"), row.names = F, na = "")
 ```
+
+```{r eval = F}
+# read in estimation_model_data
+estimation_model_data     <- read_excel(here("analyses/03-estimation/data/estimation-model-data-calc-coding.xlsx"))
+
+# closest point
+
+closest_pt_data <- tibble(q_id = c("QE1", "QE1", "QE2", "QE2", "QI1", "QI1", "QI2", "QI2", "QI3", "QI3"),
+                          dataset = rep(c("dataset1", "dataset2"), 5),
+                          closest_pt_value = c(445.4833, 466.8964,
+                                               24, 27,
+                                               15517.75, 22897.43,
+                                               11.15, 18.76,
+                                               4, 6)
+  
+)
+
+estimation_model_data2 <- full_join(estimation_model_data, closest_pt_data, by = c("q_id", "dataset")) %>%
+  rename(anchored = achnored) %>% 
+  mutate(closest_pt_deviation = as.numeric(response) - closest_pt_value,
+           closest_pt_abs_deviation = abs(closest_pt_deviation))  %>%
+  mutate(showed_work = as.numeric(showed_work)) %>%
+  group_by(participant_id) %>%
+  mutate(showed_work_n = sum(showed_work, na.rm = T)) %>%
+  ungroup() %>%
+  select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, qtext, creature, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation, showed_work, showed_work_n, calculation, scratchpad, pop20_est, pop40_est, anchored, logic, work_notes)
+
+write.csv(estimation_model_data2, file = here("analyses/03-estimation/data/estimation-model-data.csv"), row.names = F, na = "")
+```
+
+# Data
 
 ```{r}
 # estimation data
@@ -147,7 +182,14 @@ estimation_parameters <- dbReadTable(db_con,"true_parameters")
 dbDisconnect(db_con)
 
 # read in estimation_model_data
-estimation_model_data     <- read.csv(here("analyses/03-estimation/estimation-model-data.csv"))
+estimation_model_data <- read.csv(here("analyses/03-estimation/data/estimation-model-data.csv"))
+
+# grid lines
+grid_lines_data <- tibble(scale = c(rep("linear", 12), rep("log2", 10)), 
+                          grid_lines = c(seq(0,55000, 5000),
+                                         2^seq(7,16))
+) %>%
+  expand_grid(dataset = c("dataset1", "dataset2"))
 
 # plot functions
 estimationPlots <- function(q_data){
@@ -187,14 +229,14 @@ A total of `r unique(estimation_model_data$participant_id) %>% length()` partici
 
 ```{r}
 estimation_model_data %>%
-  select(participant_id, q_id, creature, dataset, scale, response, qtext, true_value) %>%
+  select(participant_id, q_id, creature, dataset, scale, response, qtext, true_value,closest_pt_value) %>%
   head() %>%
   knitr::kable(digits = 2)
 ```
 
-# Check Randomization
+<!-- # Check Randomization -->
 
-```{r}
+```{r, eval = F}
 estimation_model_data %>%
   group_by(participant_id) %>%
   mutate(N = n()) %>%
@@ -319,17 +361,13 @@ estimation_simulated_data %>%
 
 ## Data
 
-Truncated at 5000.
+<!-- Truncated at 5000. -->
 
 ```{r}
 qe1_data <- estimation_model_data %>% 
   filter(q_id == "QE1") %>%
-  mutate(response = as.numeric(response),
-         closest_pt_value = ifelse(dataset == "dataset1", 445.4833, 466.8964),
-         closest_pt_deviation = response - closest_pt_value,
-         closest_pt_abs_deviation = abs(closest_pt_deviation),
-         .after = abs_deviation) %>%
-  filter(response <= 5000)
+  mutate(response = as.numeric(response)) %>%
+  mutate(showed_work_cutoff = ifelse(showed_work_n >= 2, "yes", "no"))
 
 qe1_data %>%
   select(participant_id, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation) %>%
@@ -371,7 +409,8 @@ qe1_common_plotv3 <- qe1_data %>%
   theme(aspect.ratio = 1) +
   scale_fill_manual(values = c("steelblue", "orange3")) +
   scale_linetype_manual("Actual Value", values = c("dashed", "dotted")) +
-  scale_x_continuous("Estimated Population", limits = c(0, 1000)) +
+  # coord_cartesian(xlim = c(0,1000), ylim = c(0, 0.1)) +
+  scale_x_continuous("Estimated Population", limits = c(0,1000)) +
   scale_y_continuous("Density")
 qe1_common_plotv3
 ```
@@ -490,6 +529,411 @@ qe1_data %>%
 
 # qe1_kwMod <- kruskal.test(closest_pt_abs_deviation ~ scale, data = qe1_data)
 # qe1_kwMod
+```
+
+# Years 10, 20, 40 (First level estimates from calculation and scratchpad)
+
+## Compare used scratchpad vs not used scratchpad accuracy for pop10_est
+
+```{r}
+qe1_data %>%
+  filter(scale == "linear") %>%
+  group_by(showed_work_cutoff) %>%
+  summarize(count = n()) %>%
+  knitr::kable()
+```
+
+```{r}
+qe1_data %>%
+  group_by(dataset, scale, showed_work_cutoff) %>%
+  get_summary_stats(response, type = "median_iqr") %>%
+  knitr::kable(digits = 2)
+
+qe1_compare_work <- qe1_data %>%
+  ggplot(aes(x = response, fill = showed_work_cutoff)) +
+  geom_density(alpha = 0.5, color = NA) +
+  geom_vline(aes(xintercept = true_value, linetype = "True")) +
+  geom_vline(aes(xintercept = closest_pt_value, linetype = "Closest Point")) +
+  facet_grid(dataset ~ scale, scales = "free_y") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_linetype_manual("Actual Value", values = c("dashed", "dotted")) +
+  # coord_cartesian(xlim = c(0,1000), ylim = c(0, 0.1)) +
+  scale_x_continuous("Estimated Population", limits = c(0,1000)) +
+  scale_y_continuous("Density")
+qe1_compare_work
+```
+
+## Data Setup
+
+```{r closest_points}
+qe1_pop_est_closest_pts <- estimation_simulated_data %>% 
+  filter(x %in% c(3010, 3020, 3040)) %>%
+  mutate(year = x - 3000) %>%
+  rename(closest_pt_value = y,
+         true_value = y0) %>%
+  select(dataset, year, true_value, closest_pt_value)
+qe1_pop_est_closest_pts %>% knitr::kable()
+```
+
+```{r data-setup}
+
+qe1_pop20_est <- estimation_model_data %>%
+  filter(!is.na(pop20_est)) %>%
+  rename(population_est = pop20_est) %>%
+  mutate(year = 20, .after = scale) %>%
+  select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, qtext, creature, dataset, scale, year, population_est, showed_work, showed_work_n, calculation, scratchpad)
+
+qe1_pop40_est <- estimation_model_data %>%
+  filter(!is.na(pop40_est)) %>%
+  rename(population_est = pop40_est) %>%
+  mutate(year = 40, .after = scale) %>%
+  select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, qtext, creature, dataset, scale, year, population_est, showed_work, showed_work_n, calculation, scratchpad)
+
+qe1_pop10_est <- qe1_data %>%
+  rename(population_est = response) %>%
+  mutate(year = 10, .after = scale) %>%
+  select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, qtext, creature, dataset, scale, year, population_est, showed_work, showed_work_n, calculation, scratchpad)
+
+qe1_pop_est <- rbind(qe1_pop10_est, qe1_pop20_est, qe1_pop40_est) %>%
+  arrange(participant_id) %>%
+  group_by(participant_id) %>%
+  mutate(n_ests = n(), .after = population_est) %>%
+  ungroup() %>%
+  filter(showed_work_n >= 2) %>%
+  full_join(qe1_pop_est_closest_pts, by = c("dataset", "year")) %>%
+  mutate(deviation = population_est - true_value,
+         abs_deviation = abs(deviation),
+         closest_pt_deviation = population_est - closest_pt_value,
+         closest_pt_abs_deviation = abs(closest_pt_deviation)) %>%
+  mutate(yearest_true = log((population_est - estimation_parameters$theta)/estimation_parameters$alpha)/estimation_parameters$beta + estimation_parameters$xmin - 3000) %>%
+  mutate(yearest_true = ifelse(population_est >= 180, yearest_true, NA))
+
+dot_data <- estimation_simulated_data %>%
+  mutate(x = x - 3000)
+```
+
+```{r, common-responses-data-setup}
+qe1_popest_common_responses <- qe1_pop_est %>%
+  group_by(scale, year, dataset, true_value, closest_pt_value, population_est) %>%
+  summarize(count = n()) %>%
+  filter(count > 3) %>%
+  arrange(year, scale, -count)
+
+actual_values_data <- qe1_popest_common_responses %>%
+  # filter(scale == "linear", "log") %>%
+  select(year, scale, dataset, true_value, closest_pt_value) %>%
+  unique() %>%
+  pivot_wider(id_cols = c("year", "scale", "true_value"),
+              names_from = "dataset",
+              values_from = "closest_pt_value") %>%
+  pivot_longer(cols = c("true_value", "dataset2", "dataset1"),
+              names_to = "dataset",
+              values_to = "population_est") %>%
+  mutate(dataset = ifelse(dataset == "true_value" & scale == "linear", "dataset1",
+                          ifelse(dataset == "true_value" & scale == "log2", "dataset2", dataset))) %>%
+  mutate(scale = "linear", 
+         true_value = NA,
+         closest_pt_value = NA,
+         count = NA) %>%
+  unique() %>%
+  select(year, scale, dataset, true_value, closest_pt_value, population_est, count)
+
+qe1_popest_common_responses  <- qe1_popest_common_responses  %>%
+  rbind(actual_values_data)
+response_order <- c(unique(round(qe1_popest_common_responses$population_est,2))) %>% sort()
+```
+
+```{r, spaghettiPlotsSep}
+
+spaghettiPlotsSep <- function(yearVal, datasetID){
+  
+linear_plot <- qe1_pop_est %>%
+  filter(population_est < 55000, year == yearVal, scale == "linear", dataset == datasetID) %>%
+ggplot() +
+  
+  # add points
+  geom_point(data = dot_data %>% filter(dataset == datasetID), aes(x = x, y = y)) +
+  
+  # add spaghetti segments
+  geom_segment(aes(x = yearest_true, y = population_est, xend = 0, yend = population_est, color = scale), alpha = 0.3) +
+  geom_segment(aes(x = yearest_true, y = 100, xend = yearest_true, yend = population_est, color = scale), alpha = 0.3) +
+  
+  
+  # add arrows for true value and closest point value
+  geom_segment(aes(x = yearVal, y = true_value, xend = 0, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = closest_pt_value, xend = 0, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  
+  # extra
+  facet_grid(~dataset) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "orange3"), guide = guide_legend(override.aes = list(alpha = 1))) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_y_continuous(limits = c(100, 55000),
+                     breaks = seq(0, 55000, 5000),
+                     labels = scales::comma,
+                     minor_breaks = c())
+
+log_plot <- qe1_pop_est %>%
+  filter(population_est < 55000, year == yearVal, scale == "log2", dataset == datasetID) %>%
+ggplot() +
+  
+  # add points
+  geom_point(data = dot_data  %>% filter(dataset == datasetID), aes(x = x, y = y)) +
+  
+  # add spaghetti segments
+  geom_segment(aes(x = yearest_true, y = population_est, xend = 0, yend = population_est, color = scale), alpha = 0.3) +
+  geom_segment(aes(x = yearest_true, y = 0, xend = yearest_true, yend = population_est, color = scale), alpha = 0.3) +
+  
+  
+  # add arrows for true value and closest point value
+  geom_segment(aes(x = yearVal, y = true_value, xend = 0, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = closest_pt_value, xend = 0, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 0, xend = yearVal, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 0, xend = yearVal, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  
+  # extra
+  facet_grid(~dataset) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("orange3"), guide = guide_legend(override.aes = list(alpha = 1))) +
+  scale_fill_manual(values = c("orange3")) +
+  scale_y_continuous(trans = "log2",
+                     limits = c(100, 55000),
+                     breaks = 2^seq(0,10000,1),
+                     labels = scales::comma,
+                     minor_breaks = c()
+                     )
+
+linear_plot + log_plot
+}
+
+```
+
+
+```{r, spaghettiPlotsTogether}
+
+spaghettiPlotsTogether <- function(yearVal){
+  
+plot <- qe1_pop_est %>%
+  filter(population_est < 55000, year == yearVal) %>%
+ggplot() +
+  
+  # add points
+  geom_point(data = dot_data, aes(x = x, y = y)) +
+  
+  # add spaghetti segments
+  geom_segment(aes(x = yearest_true, y = population_est, xend = 0, yend = population_est, color = scale), alpha = 0.3) +
+  geom_segment(aes(x = yearest_true, y = 100, xend = yearest_true, yend = population_est, color = scale), alpha = 0.3) +
+  
+  
+  # add arrows for true value and closest point value
+  geom_segment(aes(x = yearVal, y = true_value, xend = 0, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = closest_pt_value, xend = 0, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+  
+  # extra
+  facet_grid(~dataset) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_color_manual(values = c("steelblue", "orange3"), guide = guide_legend(override.aes = list(alpha = 1))) +
+  scale_fill_manual(values = c("steelblue", "orange3")) +
+  scale_y_continuous(limits = c(100, 55000),
+                     breaks = seq(0, 55000, 5000),
+                     labels = scales::comma,
+                     minor_breaks = c())
+
+plot
+}
+
+```
+
+```{r, popEstSummaryStats}
+
+popEstSummaryStats <- function(yearVal, datasetID){
+ qe1_pop_est %>%
+  filter(year == yearVal, dataset == datasetID) %>%
+  group_by(dataset, year, scale) %>%
+  get_summary_stats(population_est, type = "median_iqr") %>%
+  knitr::kable(digits = 2) 
+}
+```
+
+```{r, popEstDensityPlot}
+popEstDensityPlot <- function(yearVal, datasetID, pop_limits, zoom_limits){
+
+  estPlot <- qe1_pop_est %>%
+    filter(year == yearVal, dataset == datasetID) %>%
+    filter(population_est > pop_limits[1], population_est < pop_limits[2]) %>%
+    ggplot(aes(x = population_est, fill = scale)) +
+    geom_density(alpha = 0.5, color = NA) +
+    geom_vline(aes(xintercept = true_value, linetype = "a")) +
+    geom_vline(aes(xintercept = closest_pt_value, linetype = "b")) +
+    geom_vline(data = grid_lines_data %>% 
+                 filter(dataset == "dataset1", grid_lines > pop_limits[1], grid_lines < pop_limits[2]),
+               aes(xintercept = grid_lines, color = scale, linetype = "c")) +
+    facet_zoom(xlim = zoom_limits) +
+    theme_bw() +
+    theme(aspect.ratio = 0.8) +
+    scale_color_manual(values = c("steelblue", "orange3")) +
+    scale_fill_manual(values = c("steelblue", "orange3")) +
+    scale_linetype_manual("", labels = c("True Value", "Closest Point Value", "Grid Line Breaks"), values = c("solid", "dashed", "dotted")) +
+    scale_x_continuous("Estimated Population") +
+    scale_y_continuous("Density")
+  
+  estPlot
+
+}
+```
+
+```{r, popEstBoxPlot}
+
+popEstBoxPlot <- function(yearVal, datasetID, responseVar, pop_limits, zoom_limits){
+
+  box_plot_orig <- qe1_pop_est %>%
+    filter(year == yearVal, dataset == datasetID) %>%
+    filter(population_est > pop_limits[1], population_est < pop_limits[2]) %>%
+    ggplot(aes_string(x = "scale", y = responseVar, color = "scale", fill = "scale", shape = "scale")) +
+    geom_jitter(alpha = 0.05) +
+    geom_boxplot(alpha = 0.3, width = 0.2) +
+    # geom_violin(alpha = 0.3) +
+    facet_zoom(ylim = zoom_limits) +
+    theme_bw() +
+    theme(aspect.ratio = 1) +
+    scale_color_manual(values = c("steelblue", "orange3")) +
+    scale_fill_manual(values = c("steelblue", "orange3"))
+    
+    if(responseVar == "population_est"){
+    box_plot <- box_plot_orig +
+    geom_hline(aes(yintercept = true_value, linetype = "a")) +
+    geom_hline(aes(yintercept = closest_pt_value, linetype = "b")) +
+    geom_hline(data = grid_lines_data %>% 
+                 filter(dataset == datasetID, grid_lines > pop_limits[1], grid_lines < pop_limits[2]),
+               aes(yintercept = grid_lines, color = scale, linetype = "c")) +
+    scale_linetype_manual("", labels = c("True Value", "Closest Point Value", "Grid Line Breaks"), values = c("solid", "dashed", "dotted"))
+    }
+  
+  if(responseVar != "population_est"){
+    box_plot <- box_plot_orig +
+    geom_hline(aes(yintercept = 0), linetype = "dashed")
+    }
+  
+  box_plot
+}
+```
+
+```{r popEstCommonPlot}
+popEstCommonPlot <- function(yearVal, datasetID){
+  
+  common_plot <- qe1_popest_common_responses %>%
+    filter(year == yearVal, dataset == datasetID) %>%
+    mutate(population_est = round(population_est, 2)) %>%
+    mutate(population_est = factor(population_est, response_order)) %>%
+    mutate(population_est = factor(population_est, levels = response_order)) %>%
+    ggplot(aes(x = count, xmin = 0, xmax = count, y = population_est, color = scale, shape = scale)) +
+    geom_linerange(position = position_dodge(.5)) +
+    geom_point(position = position_dodge(0.5)) +
+    geom_hline(aes(yintercept = as.factor(round(true_value,2)), linetype = "True")) +
+    geom_hline(aes(yintercept = as.factor(round(closest_pt_value,2)), linetype = "Closest Point")) +
+    # facet_grid(year ~ dataset) +
+    theme_test() +
+    theme(aspect.ratio = 0.75) +
+    scale_shape_manual("Scale", values = c(1,2)) +
+    scale_color_manual("Scale", values = c("steelblue", "orange3")) +
+    scale_linetype_manual("Actual Value", values = c("dashed", "solid")) +
+    scale_y_discrete("Estimated Population") +
+    scale_x_continuous(expand = c(0,1))
+  common_plot
+}
+```
+
+## Year 10
+
+```{r}
+spaghettiPlotsTogether(10)
+```
+
+### Data set 1
+```{r dataset1-10}
+spaghettiPlotsSep(10, "dataset1")
+popEstSummaryStats(yearVal = 10, datasetID = "dataset1")
+popEstDensityPlot(yearVal = 10, datasetID = "dataset1", pop_limits = c(0,5000), zoom_limits = c(0,1000))
+popEstCommonPlot(yearVal = 10, datasetID = "dataset1")
+popEstBoxPlot(yearVal = 10, datasetID = "dataset1", responseVar = "population_est", pop_limits = c(0, 5000), zoom_limits = c(0, 1000))
+popEstBoxPlot(yearVal = 10, datasetID = "dataset1", responseVar = "closest_pt_deviation", pop_limits = c(-1500, 1500), zoom_limits = c(-500, 500))
+```
+
+### Data set 2
+
+```{r dataset2-10}
+spaghettiPlotsSep(10, "dataset2")
+popEstSummaryStats(yearVal = 10, datasetID = "dataset2")
+popEstDensityPlot(yearVal = 10, datasetID = "dataset2", pop_limits = c(0,5000), zoom_limits = c(0,1000))
+popEstCommonPlot(yearVal = 10, datasetID = "dataset2")
+popEstBoxPlot(yearVal = 10, datasetID = "dataset2", responseVar = "population_est", pop_limits = c(0, 5000), zoom_limits = c(0, 1000))
+popEstBoxPlot(yearVal = 10, datasetID = "dataset2", responseVar = "closest_pt_deviation", pop_limits = c(-1500, 1500), zoom_limits = c(-500, 500))
+```
+
+## Year 20
+
+```{r}
+spaghettiPlotsTogether(20)
+```
+
+### Dataset 1
+
+```{r dataset1-20}
+spaghettiPlotsSep(20, "dataset1")
+popEstSummaryStats(yearVal = 20, datasetID = "dataset1")
+popEstDensityPlot(yearVal = 20, datasetID = "dataset1", pop_limits = c(0,45000), zoom_limits = c(500,5000))
+popEstCommonPlot(yearVal = 20, datasetID = "dataset1")
+popEstBoxPlot(yearVal = 20, datasetID = "dataset1", responseVar = "population_est", pop_limits = c(0,20000), zoom_limits = c(500,3000))
+popEstBoxPlot(yearVal = 20, datasetID = "dataset1", responseVar = "closest_pt_deviation", pop_limits = c(-30000, 30000), zoom_limits = c(-1000, 1000))
+```
+
+
+### Dataset 2
+
+```{r dataset2-20}
+spaghettiPlotsSep(20, "dataset2")
+popEstSummaryStats(yearVal = 20, datasetID = "dataset2")
+popEstDensityPlot(yearVal = 20, datasetID = "dataset2", pop_limits = c(0,45000), zoom_limits = c(500,5000))
+popEstCommonPlot(yearVal = 20, datasetID = "dataset2")
+popEstBoxPlot(yearVal = 20, datasetID = "dataset2", responseVar = "population_est", pop_limits = c(0,20000), zoom_limits = c(500,3000))
+popEstBoxPlot(yearVal = 20, datasetID = "dataset2", responseVar = "closest_pt_deviation", pop_limits = c(-30000, 30000), zoom_limits = c(-1000, 1000))
+```
+
+## Year 40
+
+```{r}
+spaghettiPlotsTogether(40)
+```
+
+### Dataset 1
+
+```{r dataset1-40}
+spaghettiPlotsSep(40, "dataset1")
+popEstSummaryStats(yearVal = 40, datasetID = "dataset1")
+popEstDensityPlot(yearVal = 40, datasetID = "dataset1", pop_limits = c(10000,45000), zoom_limits = c(15000, 18000))
+popEstCommonPlot(yearVal = 40, datasetID = "dataset1")
+popEstBoxPlot(yearVal = 40, datasetID = "dataset1", responseVar = "population_est", pop_limits = c(10000,45000), zoom_limits = c(15000,18000))
+popEstBoxPlot(yearVal = 40, datasetID = "dataset1", responseVar = "closest_pt_deviation", pop_limits = c(-30000, 30000), zoom_limits = c(-1000, 1000))
+```
+
+### Dataset 2
+
+```{r dataset2-40}
+spaghettiPlotsSep(40, "dataset2")
+popEstSummaryStats(yearVal = 40, datasetID = "dataset2")
+popEstDensityPlot(yearVal = 40, datasetID = "dataset2", pop_limits = c(10000,45000), zoom_limits = c(12000, 30000))
+popEstCommonPlot(yearVal = 40, datasetID = "dataset2")
+popEstBoxPlot(yearVal = 40, datasetID = "dataset2", responseVar = "population_est", pop_limits = c(10000,45000), zoom_limits = c(12000,30000))
+popEstBoxPlot(yearVal = 40, datasetID = "dataset2", responseVar = "closest_pt_deviation", pop_limits = c(-30000, 30000), zoom_limits = c(-10000, 1000))
 ```
 
 # QE2: Estimate a year given a population
