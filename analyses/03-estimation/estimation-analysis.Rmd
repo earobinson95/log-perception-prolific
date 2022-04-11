@@ -717,36 +717,50 @@ linear_plot + log_plot
 
 ```{r, spaghettiPlotsTogether}
 
-spaghettiPlotsTogether <- function(yearVal){
+spaghettiPlotsTogether <- function(yearVal, scale){
   
-plot <- qe1_pop_est %>%
-  filter(population_est < 55000, year == yearVal) %>%
-ggplot() +
+  plot <- qe1_pop_est %>%
+    filter(population_est < 55000, year == yearVal) %>%
+  ggplot() +
+    
+    # add points
+    geom_point(data = dot_data, aes(x = x, y = y)) +
+    
+    # add spaghetti segments
+    geom_segment(aes(x = yearest_true, y = population_est, xend = 0, yend = population_est, color = scale), alpha = 0.3) +
+    geom_segment(aes(x = yearest_true, y = 100, xend = yearest_true, yend = population_est, color = scale), alpha = 0.3) +
+    
+    
+    # add arrows for true value and closest point value
+    geom_segment(aes(x = yearVal, y = true_value, xend = 0, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+    geom_segment(aes(x = yearVal, y = closest_pt_value, xend = 0, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+    geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+    geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
+    
+    # extra
+    facet_grid(~dataset) +
+    theme_bw() +
+    theme(aspect.ratio = 1) +
+    scale_color_manual(values = c("steelblue", "orange3"), guide = guide_legend(override.aes = list(alpha = 1))) +
+    scale_fill_manual(values = c("steelblue", "orange3"))
   
-  # add points
-  geom_point(data = dot_data, aes(x = x, y = y)) +
+  if(scale == "linear"){
+    plot <- plot +
+      scale_y_continuous(limits = c(100, 55000),
+                       breaks = seq(0, 55000, 5000),
+                       labels = scales::comma,
+                       minor_breaks = c())
+  } 
   
-  # add spaghetti segments
-  geom_segment(aes(x = yearest_true, y = population_est, xend = 0, yend = population_est, color = scale), alpha = 0.3) +
-  geom_segment(aes(x = yearest_true, y = 100, xend = yearest_true, yend = population_est, color = scale), alpha = 0.3) +
-  
-  
-  # add arrows for true value and closest point value
-  geom_segment(aes(x = yearVal, y = true_value, xend = 0, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
-  geom_segment(aes(x = yearVal, y = closest_pt_value, xend = 0, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
-  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = true_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
-  geom_segment(aes(x = yearVal, y = 100, xend = yearVal, yend = closest_pt_value), size = 0.8, alpha = 0.7, linetype = "solid", color = "gray30", arrow = arrow(length=unit(0.2,"cm"), ends="last", type = "closed")) +
-  
-  # extra
-  facet_grid(~dataset) +
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  scale_color_manual(values = c("steelblue", "orange3"), guide = guide_legend(override.aes = list(alpha = 1))) +
-  scale_fill_manual(values = c("steelblue", "orange3")) +
-  scale_y_continuous(limits = c(100, 55000),
-                     breaks = seq(0, 55000, 5000),
-                     labels = scales::comma,
-                     minor_breaks = c())
+  if(scale == "log2"){
+    plot <- plot +
+    scale_y_continuous(trans = "log2",
+                       limits = c(100, 55000),
+                       breaks = 2^seq(0,10000,1),
+                       labels = scales::comma,
+                       minor_breaks = c()
+                       )
+  }
 
 plot
 }
@@ -855,7 +869,8 @@ popEstCommonPlot <- function(yearVal, datasetID){
 ## Year 10
 
 ```{r}
-spaghettiPlotsTogether(10)
+spaghettiPlotsTogether(10, "linear")
+spaghettiPlotsTogether(10, "log2")
 ```
 
 ### Data set 1
@@ -882,7 +897,8 @@ popEstBoxPlot(yearVal = 10, datasetID = "dataset2", responseVar = "closest_pt_de
 ## Year 20
 
 ```{r}
-spaghettiPlotsTogether(20)
+spaghettiPlotsTogether(20, "linear")
+spaghettiPlotsTogether(20, "log2")
 ```
 
 ### Dataset 1
@@ -911,7 +927,8 @@ popEstBoxPlot(yearVal = 20, datasetID = "dataset2", responseVar = "closest_pt_de
 ## Year 40
 
 ```{r}
-spaghettiPlotsTogether(40)
+spaghettiPlotsTogether(40, "linear")
+spaghettiPlotsTogether(40, "log2")
 ```
 
 ### Dataset 1
