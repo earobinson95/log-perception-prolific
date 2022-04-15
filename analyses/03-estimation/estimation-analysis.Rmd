@@ -138,8 +138,10 @@ factorCols <- c("participant_id", "age", "gender", "academic_study", "computer_m
 estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
 
 write.csv(estimation_model_data, file = here("analyses/03-estimation/data/estimation-model-data-orig.csv"), row.names = F, na = "")
-
 write.csv(estimation_simulated_data, file = here("analyses/03-estimation/data/estimation-simulated-data.csv"), row.names = F, na = "")
+write.csv(estimation_questions, file = here("analyses/03-estimation/data/estimation-questions.csv"), row.names = F, na = "")
+write.csv(estimation_scenario_text, file = here("analyses/03-estimation/data/estimation-scenario-text.csv"), row.names = F, na = "")
+write.csv(estimation_parameters, file = here("analyses/03-estimation/data/estimation-parameters.csv"), row.names = F, na = "")
 ```
 
 ```{r eval = F}
