@@ -616,6 +616,8 @@ qe1_pop_est <- rbind(qe1_pop10_est, qe1_pop20_est, qe1_pop40_est) %>%
   mutate(yearest_true = log((population_est - estimation_parameters$theta)/estimation_parameters$alpha)/estimation_parameters$beta + estimation_parameters$xmin - 3000) %>%
   mutate(yearest_true = ifelse(population_est >= 180, yearest_true, NA))
 
+write.csv(qe1_pop_est, file = here("analyses/03-estimation/data/first-level-population-estimates.csv"), row.names = F, na = "")
+
 dot_data <- estimation_simulated_data %>%
   mutate(x = x - 3000)
 ```
