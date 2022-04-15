@@ -138,6 +138,8 @@ factorCols <- c("participant_id", "age", "gender", "academic_study", "computer_m
 estimation_model_data[,factorCols] <- lapply(estimation_model_data[,factorCols], factor)
 
 write.csv(estimation_model_data, file = here("analyses/03-estimation/data/estimation-model-data-orig.csv"), row.names = F, na = "")
+
+write.csv(estimation_simulated_data, file = here("analyses/03-estimation/data/estimation-simulated-data.csv"), row.names = F, na = "")
 ```
 
 ```{r eval = F}
@@ -167,6 +169,8 @@ estimation_model_data2 <- full_join(estimation_model_data, closest_pt_data, by =
   select(participant_id, NQs, age, gender, academic_study, computer_mouse, recruitment, order, q_id, qtext, creature, dataset, scale, response, true_value, deviation, abs_deviation, closest_pt_value, closest_pt_deviation, closest_pt_abs_deviation, showed_work, showed_work_n, calculation, scratchpad, pop20_est, pop40_est, anchored, logic, work_notes)
 
 write.csv(estimation_model_data2, file = here("analyses/03-estimation/data/estimation-model-data.csv"), row.names = F, na = "")
+
+write.csv(estimation_simulated_data, file = here("analyses/03-estimation/data/estimation-simulated-data.csv"), row.names = F, na = "")
 ```
 
 # Data
