@@ -125,6 +125,20 @@ youdrawit_model_data %>%
 
 There are `r length(unique(youdrawit_model_data$participant_id)) %>% as.numeric` participants and `r length(unique(youdrawit_model_data$plot_id)) %>% as.numeric()` 'You Draw It' task plots complete.
 
+# Check Data
+```{r}
+youdrawit_model_data %>%
+  filter(x == 20) %>%
+  mutate(treatment = paste(beta, points_truncated, scale, sep = "-")) %>%
+  group_by(participant_id) %>%
+  mutate(n = n()) %>%
+  group_by(participant_id, n, treatment) %>%
+  summarize(count = n()) %>%
+  pivot_wider(id_cols = c("participant_id", "n"),
+              names_from = "treatment",
+              values_from = "count")
+```
+
 # Raw Plots
 
 ```{r, fig.width = 12, fig.height = 60, eval = F, include = F}
@@ -140,15 +154,22 @@ youdrawit_model_data %>%
 ```
 
 ```{r}
-youdrawit_model_data %>%
+spaghetti_plot <- youdrawit_model_data %>%
+  # filter(beta == "beta0.1") %>%
   ggplot(aes(x = x)) +
-  geom_line(aes(y = ynls, group = interaction(plot_id, scale)), color = "black", alpha = 0.05) +
-  geom_line(aes(y = ydrawn, group = interaction(plot_id, scale), color = scale), alpha = 0.05) +
-  # geom_point(data = youdrawit_simulated_data %>% filter(dataset == "point_data"), size = 0.8, color = "gray30", shape = 1) +
-  facet_grid(beta ~ points_truncated, scales = "free_y") +
+  geom_line(aes(y = yloess, group = plot_id, color = scale), alpha = 0.2) +
+  geom_line(alpha = 0.01, aes(y = ynls, group = plot_id, color = "Fitted NLS")) +
+  facet_grid(beta ~ points_truncated, scales = "free") +
   theme_bw() +
-  theme(aspect.ratio = 1) +
-  scale_color_manual(values = c("steelblue", "darkorange"))
+  theme(aspect.ratio = 1,
+        legend.position = "bottom"
+        ) +
+  scale_color_manual("", values = c("black", "steelblue", "orange"), labels = c("Fitted \n (NLS)", "Linear Scale \n (drawn, loess)", "Log Scale \n (drawn, loess)")) +
+  scale_x_continuous(limits = c(10, 20)) +
+  scale_y_continuous("y") +
+  guides(color = guide_legend(override.aes = list(alpha = 1)),
+         fill = guide_legend(override.aes = list(alpha = 1)))
+spaghetti_plot
 ```
 
 # Residual Plots

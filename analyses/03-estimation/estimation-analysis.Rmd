@@ -350,6 +350,47 @@ q0log_data <- estimation_model_data %>%
 createWordcloud(q0log_data)
 ```
 
+```{r}
+
+library(tidytext)
+library(corpus)
+library(reshape2)
+stem_hunspell <- function(term) {
+    # look up the term in the dictionary
+    stems <- hunspell::hunspell_stem(term)[[1]]
+
+    if (length(stems) == 0) { # if there are no stems, use the original term
+        stem <- term
+    } else { # if there are multiple stems, use the last one
+        stem <- stems[[length(stems)]]
+    }
+
+    stem
+}
+
+q0_text_orig <- estimation_model_data %>% 
+  filter(q_id == "Q0") %>%
+  select(scale, response) %>%
+  as_tibble() %>%
+  unnest_tokens(word, response)  %>%
+  mutate(stem_word = text_tokens(word, stemmer = stem_hunspell)) %>%
+  mutate(stem_word = ifelse(stem_word == "crease", "increase", stem_word))
+
+q0_text_clean1 <- q0_text_orig %>%
+  anti_join(stop_words)
+
+nums <- q0_text_clean1 %>% filter(str_detect(word, "^[0-9]")) %>% select(word) %>% unique()
+q0_text_clean2 <- q0_text_clean1 %>%
+  anti_join(nums, by = "word") %>%
+  unnest(stem_word)
+
+q0_text_summary <- q0_text_clean2 %>%
+  group_by(scale, stem_word) %>%
+  summarize(count = n()) %>%
+  arrange(scale, -count)
+# write.csv(q0_text_summary, file = here("data/03-estimation/q0-text-summary.csv"))
+```
+
 # QE1: Estimate a population given a year
 
 ## Question
