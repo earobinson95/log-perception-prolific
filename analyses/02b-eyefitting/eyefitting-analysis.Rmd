@@ -15,6 +15,7 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(digest)
 library(pls)
+library(mcr)
 
 library(RSQLite)
 library(DBI)
@@ -34,15 +35,19 @@ source("gamm-predict-function.R")
 
 # Data
 
-```{r}
+```{r, eval = F}
 # user data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/00_demographics_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
 users <- dbReadTable(db_con,"users")
 completed_sections <- dbReadTable(db_con,"completed_sections")
 dbDisconnect(db_con)
 
+users_eyefitting <- completed_sections %>%
+  filter(section_complete == "you-draw-it") %>%
+  left_join(users, by = c("nick_name", "ip_address", "study_starttime", "prolific_id"))
+
 # eyefitting data
-db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/test-run/02_you_draw_it_db.db"))
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/02_you_draw_it_db.db"))
 eyefitting_feedback <- dbReadTable(db_con,"feedback") %>%
   filter(parm_id %in% c("S", "F", "V", "N")) %>%
   select(-linear)
@@ -51,33 +56,38 @@ eyefitting_simulated <- dbReadTable(db_con, "simulated_data") %>%
 eyefitting_parms <- dbReadTable(db_con,"eyefitting_parameter_details")
 dbDisconnect(db_con)
 
-# read in eyefitting_model_data and eyefitting_simulated_data
-# eyefitting_model_data     <- read.csv(here("analyses/02b-eyefitting/data/eyefitting-model-data.csv"))
-# eyefitting_simulated_data <- read.csv(here("analyses/02b-eyefitting/data/eyefitting-simulated-data.csv"))
-```
-
-```{r, eval = T}
 # combine eyefitting and user data
 joinCols <- c("nick_name", "ip_address", "study_starttime", "prolific_id")
 
 # feedback data
-eyefitting_data_orig <- right_join(users, eyefitting_feedback, by = joinCols) %>%
+eyefitting_data_orig <- left_join(users_eyefitting, eyefitting_feedback, by = joinCols) %>%
+  filter(!is.na(x)) %>%
   rowwise() %>%
   mutate(plot_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, parm_id, start_time, end_time, sep = "-"), "md5")), .after = parm_id) %>%
   mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = parm_id) %>%
   rename(yols = y)
 
-factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "parm_id", "plot_id")
+factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "parm_id", "plot_id", "participant_id")
 eyefitting_data_orig[,factorCols] <- lapply(eyefitting_data_orig[,factorCols], factor)
 
 # simulated data
-eyefitting_simulated_data <- right_join(users, eyefitting_simulated, by = joinCols) %>%
+eyefitting_simulated_data <- left_join(users, eyefitting_simulated, by = joinCols) %>%
+  filter(!is.na(x)) %>%
+  filter(recruitment == "Prolific") %>%
   rowwise() %>%
   mutate(data_id =  as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, parm_id, sep = "-"), "md5")), .after = parm_id) %>%
   mutate(participant_id = as.factor(digest(paste(nick_name, ip_address, study_starttime, prolific_id, sep = "-"), "md5")), .before = parm_id)
 
 factorCols <- c("nick_name", "ip_address", "prolific_id", "age", "gender", "academic_study", "computer_mouse", "recruitment", "participant_id", "parm_id", "data_id", "dataset")
 eyefitting_simulated_data[,factorCols] <- lapply(eyefitting_simulated_data[,factorCols], factor)
+
+write.csv(eyefitting_simulated_data, file = here("analyses/02b-eyefitting/data/eyefitting-simulated-data.csv"), row.names = F, na = "")
+
+# common participant_id
+length(unique(eyefitting_data_orig$participant_id))
+length(unique(eyefitting_simulated_data$participant_id))
+common_participant_id <- intersect(unique(eyefitting_data_orig$participant_id), unique(eyefitting_simulated_data$participant_id))
+length(common_participant_id)
 
 # fit loess smoother
 loess_models <- eyefitting_data_orig %>%
@@ -97,73 +107,77 @@ eyefitting_loess_data <- loess_models %>%
          residual_ols_loess = yloess - yols) %>%
   select(nick_name, ip_address, study_starttime, prolific_id, age, gender, academic_study, computer_mouse, recruitment, participant_id, parm_id, plot_id, start_time, end_time, x, yols, ydrawn, yloess, residual_ols_drawn, residual_ols_loess)
 
-# fit first PCA
-pcaCalc <- function(data){
+# fit deming regression
+demingFit <- function(data){
+  fit <- mcreg(data$x, data$y, method.reg = "Deming")
+  demingIntercept <- fit@para[1]
+  demingSlope     <- fit@para[2]
   
-  data <- data %>%
-    mutate(participant_id = as.character(participant_id),
-           parm_id = as.character(parm_id)) %>%
-    rename(y = yols)
-  
-  point_data <- eyefitting_simulated_data %>%
-    mutate(participant_id = as.character(participant_id),
-           parm_id = as.character(parm_id)) %>%
-    filter(dataset == "point_data", participant_id == as.character(data[1,"participant_id"]), parm_id == as.character(data[1, 'parm_id']))
-  
-  pca_mod <- prcomp(point_data[,c("x","y")])
-  point_data$PC1 <- predict(pca_mod)[,1]
-  data$PC1 <- predict(pca_mod, newdata = data)[,1]
-  pca_lm_mod <- lm(y ~ PC1, data = point_data)
-  predict(pca_lm_mod, newdata = data)
+  return(tibble(demingIntercept = demingIntercept, demingSlope = demingSlope))
 }
 
-eyefitting_model_data <- eyefitting_loess_data %>%
+pca_preds <- eyefitting_simulated_data %>%
+  filter(dataset == "point_data", participant_id %in% unique(eyefitting_simulated_data$participant_id)[1:328]) %>%
   as_tibble() %>%
-  tidyr::nest(data = c(nick_name, ip_address, study_starttime, prolific_id, age, gender, 
-    academic_study, computer_mouse, recruitment, participant_id, 
-    parm_id, x, yols, ydrawn, yloess, residual_ols_drawn, residual_ols_loess, start_time, end_time)) %>%
-  dplyr::mutate(ypca = purrr::map(data, pcaCalc)) %>%
-  tidyr::unnest(cols = c(data, ypca)) %>%
+  tidyr::nest(-c(participant_id, data_id, parm_id)) %>%
+  dplyr::mutate(deming_fit = purrr::map(data, demingFit)) %>%
+  unnest(deming_fit) %>%
+  select(participant_id, parm_id, demingIntercept, demingSlope) %>%
+  expand_grid(x = seq(0,20,0.25)) %>%
+  mutate(ypca = demingIntercept + demingSlope*x)
+
+eyefitting_model_data <- eyefitting_loess_data %>%
+  filter(participant_id %in% unique(eyefitting_simulated_data$participant_id)[1:328]) %>%
+  left_join(pca_preds, by = c("participant_id", "x", "parm_id")) %>%
   mutate(residual_pca_drawn = ydrawn - ypca,
          residual_pca_loess = yloess - ypca) %>%
   dplyr::select(nick_name, ip_address, study_starttime, prolific_id, age, gender, academic_study, computer_mouse, recruitment, participant_id, parm_id, plot_id, x, yols, ypca, ydrawn, yloess, residual_ols_drawn, residual_ols_loess, residual_pca_drawn, residual_pca_loess)
+  
+write.csv(eyefitting_model_data, file = here("analyses/02b-eyefitting/data/eyefitting-model-data.csv"), row.names = F, na = "")
+
+write.csv(eyefitting_model_data, file = here("analyses/02b-eyefitting/data/eyefitting-parameters.csv"), row.names = F, na = "")
+```
+
+```{r}
+
+# read in eyefitting_model_data and eyefitting_simulated_data
+eyefitting_model_data     <- read_csv(here("analyses/02b-eyefitting/data/eyefitting-model-data.csv"))
+eyefitting_simulated_data <- read_csv(here("analyses/02b-eyefitting/data/eyefitting-simulated-data.csv"))
+eyefitting_parameters <- read_csv(here("analyses/02b-eyefitting/data/eyefitting-parameters.csv"))
 ```
 
 There are `r length(unique(eyefitting_model_data$prolific_id)) %>% as.numeric` participants and `r length(unique(eyefitting_model_data$plot_id)) %>% as.numeric()` 'You Draw It' Eyefitting task plots complete.
 
 ```{r}
-eyefitting_parms %>%
+eyefitting_parameters %>%
   knitr::kable(caption = "Eyefitting Parameter Details")
 
 eyefitting_model_data %>%
   select(participant_id, parm_id, x, yols, ypca, ydrawn, yloess, residual_ols_drawn, residual_pca_drawn) %>%
   head() %>%
   knitr::kable(digits = 3, caption = "Eyefitting Model Data (head)")
-
-# write.csv(eyefitting_model_data, here("analyses/02b-eyefitting/data/eyefitting-model-data.csv"), row.names = F, na = "")
-# write.csv(eyefitting_simulated_data, here("analyses/02b-eyefitting/data/eyefitting-simulated-data.csv"))
 ```
 
-# Raw Plots
-
-```{r, fig.width = 12, fig.height = 60}
+# Example
+```{r}
+# example
 eyefitting_model_data %>%
-  pivot_longer(cols = c(yols, ypca, ydrawn),
-               names_to = "method",
-               values_to = "y") %>%
-  ggplot(aes(x = x, y = y)) +
-  geom_line(aes(group = interaction(plot_id, method), color = method, linetype = method)) +
-  geom_point(data = eyefitting_simulated_data %>% filter(dataset == "point_data"), size = 0.8, color = "gray30", shape = 1) +
-  facet_grid(participant_id ~ parm_id) +
+  # filter(participant_id == "65c10d498eae365e108efcd3dcb75287", parm_id == "N") %>%
+  filter(participant_id == "60b16b9bd5a122c1457d31055df51a45", parm_id == "F") %>%
+  ggplot(aes(x = x)) +
+  geom_line(aes(y = yols), color = "steelblue") +
+  geom_line(aes(y = ypca), color = "orange2") +
+  geom_line(aes(y = ydrawn), color = "black", linetype = "dashed") +
+  geom_point(data = eyefitting_simulated_data %>%
+               filter(dataset == "point_data", participant_id == "60b16b9bd5a122c1457d31055df51a45", parm_id == "F"),
+             aes(x = x, y = y)) +
+  facet_wrap(~ parm_id) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  scale_color_manual(values = c("black", "steelblue", "darkorange")) +
-  scale_linetype_manual(values = c("dashed", "solid", "solid"))
+  scale_y_continuous("y")
 ```
 
-# Residual Plots
-
-```{r, fig.width = 12, fig.height = 5}
+```{r, fig.width = 12, fig.height = 5, eval = F}
 eyefitting_model_data %>%
   pivot_longer(cols = c(residual_ols_drawn, residual_pca_drawn),
                names_to = "method",
@@ -193,50 +207,60 @@ eyefitting_model_data %>%
 
 # Linear Constraint (LMER)
 
-```{r, eval = F, echo = T}
+```{r, eval = F, echo = F}
 # OLS
 # tic()
-eyefitting.ols.lmer <- lmer(residualols ~ -1 + parm_id + x:parm_id + (1|participantID),
-                            data = eyefitting_model_data)
+eyefitting.ols.lmer <- lmer(residual_ols_drawn ~ -1 + parm_id + x:parm_id + (1|participant_id),
+                            data = eyefitting_model_data %>%
+                             mutate(parm_id = factor(parm_id),
+                                    participant_id = factor(participant_id)))
 # toc()
 # summary(eyefitting.ols.lmer)
 # anova(eyefitting.ols.lmer)
 
 # pca
 # tic()
-eyefitting.pca.lmer <- lmer(residualpca ~ -1 + parm_id + x:parm_id + (1|participantID),
-                            data = eyefitting_model_data)
+eyefitting.pca.lmer <- lmer(residual_pca_drawn ~ -1 + parm_id + x:parm_id + (1|participant_id),
+                            data = eyefitting_model_data %>%
+                             mutate(parm_id = factor(parm_id),
+                                    participant_id = factor(participant_id)))
 # toc()
 # summary(eyefitting.pca.lmer)
 # anova(eyefitting.pca.lmer)
 
 # Obtain Predictions
 eyefitting.ols.grid.lmer  <- ref_grid(eyefitting.ols.lmer, at = list(x = seq(1,20,0.5)))
-eyefitting.ols.preds.lmer <- emmeans(eyefitting.ols.grid.lmer, ~ parm_id:x, cov.reduce = FALSE) %>% 
+eyefitting.ols.preds.lmer <- emmeans(eyefitting.ols.grid.lmer, ~ parm_id:x) %>%
   as_tibble()
 
 eyefitting.pca.grid.lmer  <- ref_grid(eyefitting.pca.lmer, at = list(x = seq(1,20,0.5)))
-eyefitting.pca.preds.lmer <- emmeans(eyefitting.pca.grid.lmer, ~ parm_id:x, cov.reduce = FALSE) %>% 
+eyefitting.pca.preds.lmer <- emmeans(eyefitting.pca.grid.lmer, ~ parm_id:x) %>%
   as_tibble()
 
 eyefitting.preds.lmer <- eyefitting.ols.preds.lmer %>%
   full_join(eyefitting.pca.preds.lmer, by = c("x", "parm_id"), suffix = c(".ols", ".pca"))
 
+# write.csv(eyefitting.preds.lmer, file = here("analyses/02b-eyefitting/data/eyefitting-lmer-preds.csv"), row.names = F, na = "")
+```
+
+```{r}
+eyefitting_lmer_preds <- read_csv(here("analyses/02b-eyefitting/data/eyefitting-lmer-preds.csv"))
+
 # Plot Predictions
-eyefitting.preds.lmer %>%
+eyefitting_lmer_preds %>%
   filter((parm_id %in% c("F", "N", "S") | (x <= 16 & x >= 4))) %>%
   ggplot(aes(x = x)) +
-  geom_line(data = eyefitting_model_data, aes(x = x, y = residualols, group = plotID, color = "OLS"), alpha = 0.1) +
-  geom_line(data = eyefitting_model_data, aes(x = x, y = residualpca, group = plotID, color = "PCA"), alpha = 0.1) +
-  geom_ribbon(aes(ymin = asymp.LCL.ols, ymax = asymp.UCL.ols, fill = "OLS"), color = NA, alpha = 0.7) +
+  geom_line(data = eyefitting_model_data, aes(x = x, y = residual_ols_loess, group = plot_id, color = "OLS"), alpha = 0.01) +
+  geom_line(data = eyefitting_model_data, aes(x = x, y = residual_pca_loess, group = plot_id, color = "PCA"), alpha = 0.01) +
+  geom_ribbon(aes(ymin = asymp.LCL.ols, ymax = asymp.UCL.ols, fill = "OLS"), color = NA, alpha = 0.4) +
   geom_line(aes(y = emmean.ols, color = "OLS")) +
-  geom_ribbon(aes(ymin = asymp.LCL.pca, ymax = asymp.UCL.pca, fill = "PCA"), color = NA, alpha = 0.7) +
+  geom_ribbon(aes(ymin = asymp.LCL.pca, ymax = asymp.UCL.pca, fill = "PCA"), color = NA, alpha = 0.4) +
   geom_line(aes(y = emmean.pca, color = "PCA")) +
   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
   facet_wrap(~parm_id) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  scale_y_continuous("Residual") +
+  scale_y_continuous("Residual", limits = c(-5,5), breaks = seq(-5,5,2.5)) +
   scale_color_manual("Estimates", values = c("steelblue", "orange")) +
   scale_fill_manual("Estimates", values = c("steelblue", "orange")) +
   ggtitle("Eyefitting LMER")
@@ -244,27 +268,31 @@ eyefitting.preds.lmer %>%
 
 # Smoothing Splines (GAMM)
 
-```{r, eval = F, echo = T}
+```{r, eval = F, echo = F}
 # OLS
 # tic()
-eyefitting.ols.gamm <- bam(residualols ~ -1 + parm_id + 
+eyefitting.ols.gamm <- bam(residual_ols_drawn ~ -1 + parm_id + 
                              s(x, by = parm_id) +
-                             s(participantID, bs = "re") +
-                             s(x,participantID, bs = "re"),
+                             s(participant_id, bs = "re") +
+                             s(x,participant_id, bs = "re"),
                            method = "REML",
-                           data = eyefitting_model_data)
+                           data = eyefitting_model_data %>%
+                             mutate(parm_id = factor(parm_id),
+                                    participant_id = factor(participant_id)))
 # toc()
 # summary(eyefitting.ols.gamm)
 # anova(eyefitting.ols.gamm)
 
 # pca
 # tic()
-eyefitting.pca.gamm <- bam(residualpca ~ -1 + parm_id + 
+eyefitting.pca.gamm <- bam(residual_pca_drawn ~ -1 + parm_id + 
                              s(x, by = parm_id) +
-                             s(participantID, bs = "re") +
-                             s(x,participantID, bs = "re"),
+                             s(participant_id, bs = "re") +
+                             s(x,participant_id, bs = "re"),
                            method = "REML",
-                           data = eyefitting_model_data)
+                           data = eyefitting_model_data %>%
+                             mutate(parm_id = factor(parm_id),
+                                    participant_id = factor(participant_id)))
 # toc()
 # summary(eyefitting.pca.gamm)
 # anova(eyefitting.pca.gamm)
@@ -272,7 +300,7 @@ eyefitting.pca.gamm <- bam(residualpca ~ -1 + parm_id +
 # Obtain Predictions
 eyefitting.grid.gamm <- expand_grid(parm_id = c("S", "V", "F", "N"),
                                     x = seq(0,20, 0.5),
-                                    participantID = eyefitting_model_data$participantID[1])
+                                    participant_id = eyefitting_model_data$participant_id[1])
 
 # OLS
 eyefitting.ols.preds <- predict_gamm(eyefitting.ols.gamm, newdata = eyefitting.grid.gamm, se = T, re_form = NA)
@@ -286,21 +314,27 @@ eyefitting.grid.gamm$pca.pred <- eyefitting.pca.preds$prediction
 eyefitting.grid.gamm$pca.lower <- eyefitting.pca.preds$prediction - (1.96 * eyefitting.pca.preds$se)
 eyefitting.grid.gamm$pca.upper <- eyefitting.pca.preds$prediction + (1.96 * eyefitting.pca.preds$se)
 
+write.csv(eyefitting.grid.gamm, file = here("analyses/02b-eyefitting/data/eyefitting-gamm-preds.csv"), row.names = F, na = "")
+```
+
+```{r}
+eyefitting_gamm_preds <- read_csv(here("analyses/02b-eyefitting/data/eyefitting-gamm-preds.csv"))
+
 # Plot Predictions
-eyefitting.grid.gamm %>%
+eyefitting_gamm_preds %>%
   filter((parm_id %in% c("F", "N", "S") | (x <= 16 & x >= 4))) %>%
   ggplot(aes(x = x)) +
-  geom_line(data = eyefitting_model_data, aes(x = x, y = residualpca, group = plotID, color = "PCA"), alpha = 0.1) +
-  geom_line(data = eyefitting_model_data, aes(x = x, y = residualols, group = plotID, color = "OLS"), alpha = 0.1) +
-  geom_ribbon(aes(ymin = ols.lower, ymax = ols.upper, fill = "OLS"), color = NA, alpha = 0.7) +
+  geom_line(data = eyefitting_model_data, aes(x = x, y = residual_pca_drawn, group = plot_id, color = "PCA"), alpha = 0.01) +
+  geom_line(data = eyefitting_model_data, aes(x = x, y = residual_ols_drawn, group = plot_id, color = "OLS"), alpha = 0.01) +
+  geom_ribbon(aes(ymin = ols.lower, ymax = ols.upper, fill = "OLS"), color = NA, alpha = 0.3) +
   geom_line(aes(y = ols.pred, color = "OLS")) +
-  geom_ribbon(aes(ymin = pca.lower, ymax = pca.upper, fill = "PCA"), color = NA, alpha = 0.7) +
+  geom_ribbon(aes(ymin = pca.lower, ymax = pca.upper, fill = "PCA"), color = NA, alpha = 0.3) +
   geom_line(aes(y = pca.pred, color = "PCA")) +
   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
   facet_wrap(~parm_id) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  scale_y_continuous("Residual") +
+  scale_y_continuous("Residual", limits = c(-5,5), breaks = seq(-5,5,2.5)) +
   scale_color_manual("Estimates", values = c("steelblue", "orange")) +
   scale_fill_manual("Estimates", values = c("steelblue", "orange")) +
   ggtitle("Eyefitting GAMM")
