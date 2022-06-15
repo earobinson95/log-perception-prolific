@@ -56,7 +56,7 @@ demographic_data <- full_join(users, completed_sections, by = c("nick_name", "ip
 
 ```{r}
 demographic_data %>%
-  filter(recruitment != "I am the researcher") %>%
+  filter(recruitment == "Prolific") %>%
   select(recruitment, prolific_id, studies_complete, informed_consent,	demographics,	lineups,	you_draw_it,	estimation) %>%
   knitr::kable()
 ```

@@ -1,0 +1,133 @@
+---
+title: "Demographics Summary"
+author: "Emily Robinson"
+date: "Spring 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = FALSE,
+	fig.align = 'center',
+	fig.width = 9,
+	fig.height = 6
+)
+library(tidyverse)
+library(plotly)
+library(digest)
+
+library(RSQLite)
+library(DBI)
+library(here)
+library(readr)
+
+library(lme4)
+library(emmeans)
+library(tictoc)
+```
+
+```{r}
+# user data
+db_con <- dbConnect(dbDriver("SQLite"), dbname = here("perception-of-statistical-graphics/databases/00_demographics_db.db"))
+users <- dbReadTable(db_con,"users")
+completed_sections_orig <- dbReadTable(db_con,"completed_sections")
+dbDisconnect(db_con)
+
+completed_estimation <- completed_sections_orig %>%
+  filter(section_complete == "estimation")
+
+combined_user <- users %>%
+  right_join(completed_estimation, by = c("nick_name", "ip_address", "study_starttime", "prolific_id")) %>%
+  filter(recruitment == "Prolific") %>%
+  select(nick_name, age, gender, academic_study, computer_mouse)
+
+factorCols <- c("nick_name", "age", "gender", "academic_study", "computer_mouse")
+combined_user[,factorCols] <- lapply(combined_user[,factorCols], factor)
+
+write.csv(combined_user, file = "combined-user.csv")
+```
+
+```{r}
+head(combined_user)
+
+summary(combined_user)
+```
+
+```{r}
+age_demPlot <- combined_user %>%
+    mutate(age = factor(age, levels = c("19-25", "26-30", "31-35", "36-40", "41-45", "46-50", "51-55", "56-60", "Over 60"))) %>%
+  filter(!is.na(age)) %>%
+  group_by(age) %>%
+  summarise(size = n(),
+            prop = n()/296) %>%
+  ggplot(aes(x = age, y = prop)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  theme_bw() +
+  theme(aspect.ratio = 0.5) +
+  scale_y_continuous("Percentage of sample", limits = c(0,1), breaks = seq(0,1,0.2), labels = scales::percent) +
+  scale_x_discrete("Age group") +
+  ggtitle("Age Range")
+
+age_demPlot
+ggsave(age_demPlot, filename = "age-demplot.png", width = 12, height = 6)
+```
+
+```{r}
+gender_demPlot <- combined_user %>%
+    mutate(gender = factor(gender, levels = c("Female", "Male", "Variant/Nonconforming", "Prefer not to answer"))) %>%
+  filter(!is.na(gender)) %>%
+  group_by(gender) %>%
+  summarise(size = n(),
+            prop = n()/301) %>%
+  ggplot(aes(x = gender, y = prop)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  theme_bw() +
+  theme(aspect.ratio = 0.5) +
+  scale_y_continuous("Percentage of sample", limits = c(0,1), breaks = seq(0,1,0.2), labels = scales::percent) +
+  scale_x_discrete("Gender Identity") +
+  ggtitle("Gender Identity")
+
+gender_demPlot
+ggsave(gender_demPlot, filename = "gender-demplot.png", width = 12, height = 6)
+```
+
+```{r}
+education_demPlot <- combined_user %>%
+    mutate(academic_study = factor(academic_study, levels = c("High School or Less", "Some Undergraduate Courses", "Undergraduate Degree", "Some Graduate Courses", "Graduate Degree", "Prefer not to answer"))) %>%
+  filter(!is.na(academic_study)) %>%
+  group_by(academic_study) %>%
+  summarise(size = n(),
+            prop = n()/301) %>%
+  ggplot(aes(x = academic_study, y = prop)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  theme_bw() +
+  theme(aspect.ratio = 0.5) +
+  scale_y_continuous("Percentage of sample", limits = c(0,1), breaks = seq(0,1,0.2), labels = scales::percent) +
+  scale_x_discrete("Education level") +
+  ggtitle("Highest Education Level")
+
+education_demPlot
+ggsave(education_demPlot, filename = "education-demplot.png", width = 12, height = 6)
+```
+
+```{r}
+mouse_demPlot <- combined_user %>%
+    mutate(computer_mouse = factor(computer_mouse, levels = c("Yes", "No"))) %>%
+  filter(!is.na(computer_mouse)) %>%
+  group_by(computer_mouse) %>%
+  summarise(size = n(),
+            prop = n()/301) %>%
+  ggplot(aes(x = computer_mouse, y = prop)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  theme_bw() +
+  theme(aspect.ratio = 0.5) +
+  scale_y_continuous("Percentage of sample", limits = c(0,1), breaks = seq(0,1,0.2), labels = scales::percent) +
+  scale_x_discrete("Computer mouse") +
+  ggtitle("Are you using a computer mouse to complete the study?")
+
+mouse_demPlot
+ggsave(mouse_demPlot, filename = "mouse-demplot.png", width = 12, height = 6)
+```
