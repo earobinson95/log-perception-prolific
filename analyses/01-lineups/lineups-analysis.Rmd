@@ -107,6 +107,25 @@ lineup_model_data <- lineup_data_orig %>%
   select(participant_id, n_lineups, age, gender, academic_study, computer_mouse, recruitment, dataset_id, set, curvature, target, null, scale, correct, response_no, binary_response, conf_level, choice_reason)
 
 write.csv(lineup_model_data, here("analyses/01-lineups/lineup-model-data.csv"), row.names = F, na = "")
+
+
+
+lineup_rorschach_data <- lineup_data_orig %>%
+  separate(param_value, into = c(NA, "target", NA, "null", NA), sep = "-") %>%
+  filter(target == null) %>%
+  mutate(curvature = paste0("t-", target, "_n-", null), .after = null) %>%
+  rowwise() %>%
+  mutate(dataset_id = as.factor(digest(paste(curvature, set, sep = "-"), "md5")), .after = set) %>%
+  rename(scale = test_param) %>%
+  mutate(binary_response = ifelse(correct %in% as.numeric(unlist(strsplit(response_no, split = ","))), 1, 0), .after = response_no) %>%
+  group_by(participant_id, nick_name, ip_address, study_starttime, prolific_id) %>%
+  mutate(n_lineups = n()) %>%
+  ungroup() %>%
+  filter(!is.na(section_complete)) %>%
+  # filter(participant_id %in% all_participants$participant_id) %>%
+  select(participant_id, n_lineups, age, gender, academic_study, computer_mouse, recruitment, dataset_id, set, curvature, target, null, scale, correct, response_no, binary_response, conf_level, choice_reason)
+
+write.csv(lineup_rorschach_data, here("analyses/01-lineups/lineup-rorschach-data.csv"), row.names = F, na = "")
 ```
 
 ```{r, eval = T}
